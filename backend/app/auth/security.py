@@ -5,8 +5,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.database.session import get_db
@@ -17,8 +17,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-async def get_user_by_login(db: AsyncSession, login: str) -> User | None:
-    result = await db.execute(select(User).where(User.login == login))
+def get_user_by_login(db: Session, login: str) -> User | None:
+    result = db.execute(select(User).where(User.login == login))
     return result.scalar_one_or_none()
 
 
@@ -44,7 +44,7 @@ def hash_password(password: str) -> str:
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -59,7 +59,7 @@ async def get_current_user(
     except JWTError as exc:
         raise credentials_exception from exc
 
-    user = await get_user_by_login(db, login)
+    user = get_user_by_login(db, login)
     if user is None or not user.active:
         raise credentials_exception
     return user
