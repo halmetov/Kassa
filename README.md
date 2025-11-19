@@ -1,73 +1,57 @@
-# Welcome to your Lovable project
+# Kassa (Склад + Касса)
 
-## Project info
+Полноценный моно-репозиторий с FastAPI backend и Vite + React frontend.
 
-**URL**: https://lovable.dev/projects/5800dd3a-1805-40a3-ac08-309dbac54f00
+## Структура
 
-## How can I edit this code?
+```
+/backend
+  app/
+    api, models, schemas, services, auth, database
+  migrations/
+  requirements.txt
+/frontend
+  package.json, vite.config.ts, src/
+```
 
-There are several ways of editing your application.
+## Backend
 
-**Use Lovable**
+### Быстрый старт
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5800dd3a-1805-40a3-ac08-309dbac54f00) and start prompting.
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # настройте DATABASE_URL и JWT_SECRET_KEY
+alembic upgrade head
+uvicorn app.main:app --reload
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### Возможности
 
-**Use your preferred IDE**
+- JWT (access + refresh) авторизация и проверки ролей (admin/seller)
+- CRUD для категорий, товаров, сотрудников, филиалов, клиентов
+- Приходы с автоматическим обновлением склада
+- Продажи (POS API) c учётом остатков и долгов
+- Возвраты, отчёты, статические загрузки фото
+- Alembic миграции и модульная структура сервисов
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+API доступен по `http://localhost:8000`, статические файлы — `/static`.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Frontend
 
-Follow these steps:
+### Быстрый старт
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+cd frontend
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Vite поднимет SPA на `http://localhost:5173`. В `.env` приложения можно указать `VITE_API_URL` (по умолчанию `http://localhost:8000`).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Дополнительно
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/5800dd3a-1805-40a3-ac08-309dbac54f00) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- В каталоге `backend/app/static/uploads` сохраняются фото товаров.
+- Схема базы данных покрывает таблицы: `users, categories, products, branches, stock, income, income_items, sales, sales_items, clients, debts, returns, logs`.
+- Для интеграции с мобильной кассой используйте endpoints `/api/sales`, `/api/categories`, `/api/products`.
