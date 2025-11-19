@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.auth.security import (
     create_access_token,
@@ -21,8 +21,8 @@ settings = get_settings()
 
 
 @router.post("/login", response_model=auth_schema.Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    user = await get_user_by_login(db, form_data.username)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = get_user_by_login(db, form_data.username)
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.active:
@@ -33,8 +33,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
 
 
 @router.post("/register", response_model=auth_schema.AuthUser)
-async def register_user(payload: auth_schema.LoginRequest, db: AsyncSession = Depends(get_db)):
-    existing = await get_user_by_login(db, payload.username)
+async def register_user(payload: auth_schema.LoginRequest, db: Session = Depends(get_db)):
+    existing = get_user_by_login(db, payload.username)
     if existing:
         raise HTTPException(status_code=400, detail="Login already exists")
     user = User(
@@ -44,8 +44,8 @@ async def register_user(payload: auth_schema.LoginRequest, db: AsyncSession = De
         role="seller",
     )
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    db.commit()
+    db.refresh(user)
     return user
 
 
@@ -55,13 +55,13 @@ async def get_profile(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh", response_model=auth_schema.Token)
-async def refresh_token(payload: auth_schema.RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_token(payload: auth_schema.RefreshRequest, db: Session = Depends(get_db)):
     try:
         data = jwt.decode(payload.refresh_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid refresh token") from exc
     login = data.get("sub")
-    user = await get_user_by_login(db, login)
+    user = get_user_by_login(db, login)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     access_token = create_access_token(user.login)

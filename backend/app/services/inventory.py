@@ -1,11 +1,11 @@
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models.entities import Stock
 
 
-async def adjust_stock(db: AsyncSession, branch_id: int, product_id: int, delta: int) -> Stock:
-    result = await db.execute(
+def adjust_stock(db: Session, branch_id: int, product_id: int, delta: int) -> Stock:
+    result = db.execute(
         select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == product_id)
     )
     stock = result.scalar_one_or_none()
@@ -15,5 +15,5 @@ async def adjust_stock(db: AsyncSession, branch_id: int, product_id: int, delta:
     stock.quantity += delta
     if stock.quantity < 0:
         stock.quantity = 0
-    await db.flush()
+    db.flush()
     return stock
