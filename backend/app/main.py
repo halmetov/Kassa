@@ -15,10 +15,21 @@ from app.api import (
     routes_users,
 )
 from app.core.config import get_settings
+from app.database.base import Base
+from app.database.session import engine
+
+import app.models  # noqa: F401 - ensure models are imported for metadata
 
 settings = get_settings()
 
 app = FastAPI(title="Kassa API", version="1.0.0")
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    Base.metadata.create_all(bind=engine)
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
