@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -23,23 +23,22 @@ import {
 } from "@/components/ui/select";
 
 interface Product {
-  id: string;
+  id: number;
   name: string;
-  category_id: string | null;
+  category_id: number | null;
   unit: string;
   barcode: string | null;
   purchase_price: number;
   sale_price: number;
   wholesale_price: number;
-  limit_quantity: number;
+  limit: number | null;
   quantity: number;
-  categories?: { name: string };
 }
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -49,7 +48,7 @@ export default function Products() {
     purchase_price: "0",
     sale_price: "0",
     wholesale_price: "0",
-    limit_quantity: "0",
+    limit: "0",
   });
 
   const [editData, setEditData] = useState<any>({});
@@ -60,29 +59,22 @@ export default function Products() {
   }, []);
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        *,
-        categories (name)
-      `)
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await apiGet<Product[]>("/api/products");
+      setProducts(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки товаров");
-      return;
     }
-    setProducts(data || []);
   };
 
   const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name');
-
-    if (error) return;
-    setCategories(data || []);
+    try {
+      const data = await apiGet<{ id: number; name: string }[]>("/api/categories");
+      setCategories(data);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleAdd = async () => {
@@ -91,23 +83,24 @@ export default function Products() {
       return;
     }
 
-    const { error } = await supabase.from('products').insert({
-      name: formData.name.trim(),
-      category_id: formData.category_id || null,
-      unit: formData.unit,
-      barcode: formData.barcode || null,
-      purchase_price: parseFloat(formData.purchase_price) || 0,
-      sale_price: parseFloat(formData.sale_price) || 0,
-      wholesale_price: parseFloat(formData.wholesale_price) || 0,
-      limit_quantity: parseInt(formData.limit_quantity) || 0,
-    });
+    try {
+      await apiPost("/api/products", {
+        name: formData.name.trim(),
+        category_id: formData.category_id ? Number(formData.category_id) : null,
+        unit: formData.unit,
+        barcode: formData.barcode || null,
+        purchase_price: parseFloat(formData.purchase_price) || 0,
+        sale_price: parseFloat(formData.sale_price) || 0,
+        wholesale_price: parseFloat(formData.wholesale_price) || 0,
+        limit: parseInt(formData.limit) || 0,
+      });
 
-    if (error) {
+      toast.success("Товар добавлен");
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка добавления товара");
       return;
     }
-
-    toast.success("Товар добавлен");
     setFormData({
       name: "",
       category_id: "",
@@ -116,7 +109,7 @@ export default function Products() {
       purchase_price: "0",
       sale_price: "0",
       wholesale_price: "0",
-      limit_quantity: "0",
+      limit: "0",
     });
     fetchProducts();
   };
@@ -125,54 +118,46 @@ export default function Products() {
     setEditingId(product.id);
     setEditData({
       name: product.name,
-      category_id: product.category_id || "",
+      category_id: product.category_id ? String(product.category_id) : "",
       unit: product.unit,
       barcode: product.barcode || "",
       purchase_price: product.purchase_price.toString(),
       sale_price: product.sale_price.toString(),
       wholesale_price: product.wholesale_price.toString(),
-      limit_quantity: product.limit_quantity.toString(),
+      limit: (product.limit ?? 0).toString(),
     });
   };
 
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from('products')
-      .update({
+  const handleSave = async (id: number) => {
+    try {
+      await apiPut(`/api/products/${id}`, {
         name: editData.name,
-        category_id: editData.category_id || null,
+        category_id: editData.category_id ? Number(editData.category_id) : null,
         unit: editData.unit,
         barcode: editData.barcode || null,
         purchase_price: parseFloat(editData.purchase_price) || 0,
         sale_price: parseFloat(editData.sale_price) || 0,
         wholesale_price: parseFloat(editData.wholesale_price) || 0,
-        limit_quantity: parseInt(editData.limit_quantity) || 0,
-      })
-      .eq('id', id);
-
-    if (error) {
+        limit: parseInt(editData.limit) || 0,
+      });
+      toast.success("Товар обновлен");
+      setEditingId(null);
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка обновления");
-      return;
     }
-
-    toast.success("Товар обновлен");
-    setEditingId(null);
-    fetchProducts();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    try {
+      await apiDelete(`/api/products/${id}`);
+      toast.success("Товар удален");
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка удаления");
-      return;
     }
-
-    toast.success("Товар удален");
-    fetchProducts();
   };
 
   return (
@@ -204,7 +189,7 @@ export default function Products() {
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
+                  <SelectItem key={cat.id} value={String(cat.id)}>
                     {cat.name}
                   </SelectItem>
                 ))}
@@ -281,8 +266,10 @@ export default function Products() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.id}>
+            {products.map((product) => {
+              const categoryName = categories.find((cat) => cat.id === product.category_id)?.name || "Без категории";
+              return (
+              <TableRow key={product.id}>
                   <TableCell>
                     {editingId === product.id ? (
                       <Input
@@ -304,14 +291,14 @@ export default function Products() {
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id}>
+                            <SelectItem key={cat.id} value={String(cat.id)}>
                               {cat.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      product.categories?.name || "Без категории"
+                      categoryName
                     )}
                   </TableCell>
                   <TableCell>
@@ -375,15 +362,15 @@ export default function Products() {
                     {editingId === product.id ? (
                       <Input
                         type="number"
-                        value={editData.limit_quantity}
-                        onChange={(e) => setEditData({ ...editData, limit_quantity: e.target.value })}
+                        value={editData.limit}
+                        onChange={(e) => setEditData({ ...editData, limit: e.target.value })}
                         className="w-20"
                       />
                     ) : (
-                      product.limit_quantity
+                      product.limit ?? 0
                     )}
                   </TableCell>
-                  <TableCell className={product.quantity <= product.limit_quantity ? "text-destructive font-semibold" : ""}>
+                  <TableCell className={product.quantity <= (product.limit ?? 0) ? "text-destructive font-semibold" : ""}>
                     {product.quantity}
                   </TableCell>
                   <TableCell>
@@ -426,7 +413,8 @@ export default function Products() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              );
+            })}
             </TableBody>
           </Table>
         </div>

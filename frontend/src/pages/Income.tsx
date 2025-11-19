@@ -1,21 +1,24 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Pencil, Trash2, Save, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { apiDelete, apiGet, apiPost } from "@/api/client";
+
+type Branch = { id: number; name: string; active?: boolean };
+type Product = { id: number; name: string };
+type IncomeItem = { id: number; product_id: number; quantity: number; purchase_price: number; sale_price: number };
+type IncomeRecord = { id: number; branch_id: number; created_at: string; items: IncomeItem[] };
 
 export default function Income() {
-  const [branches, setBranches] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [receipts, setReceipts] = useState<any[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<any>({});
-  
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [incomes, setIncomes] = useState<IncomeRecord[]>([]);
   const [formData, setFormData] = useState({
     branch_id: "",
     product_id: "",
@@ -27,143 +30,80 @@ export default function Income() {
   useEffect(() => {
     fetchBranches();
     fetchProducts();
-    fetchReceipts();
+    fetchIncomes();
   }, []);
 
   const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from("branches")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
-    
-    if (error) {
+    try {
+      const data = await apiGet<Branch[]>("/api/branches");
+      setBranches(data.filter((branch) => branch.active));
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки филиалов");
-      return;
     }
-    setBranches(data || []);
   };
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*, categories(name)")
-      .order("name");
-    
-    if (error) {
+    try {
+      const data = await apiGet<Product[]>("/api/products");
+      setProducts(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки товаров");
-      return;
     }
-    setProducts(data || []);
   };
 
-  const fetchReceipts = async () => {
-    const { data, error } = await supabase
-      .from("stock_receipts")
-      .select(`
-        *,
-        branches(name),
-        products(name),
-        employees(name)
-      `)
-      .order("created_at", { ascending: false });
-    
-    if (error) {
+  const fetchIncomes = async () => {
+    try {
+      const data = await apiGet<IncomeRecord[]>("/api/income");
+      setIncomes(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки истории");
-      return;
     }
-    setReceipts(data || []);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.branch_id || !formData.product_id || !formData.quantity || 
-        !formData.purchase_price || !formData.sale_price) {
+    if (!formData.branch_id || !formData.product_id || !formData.quantity || !formData.purchase_price || !formData.sale_price) {
       toast.error("Заполните все поля");
       return;
     }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { data: employee } = await supabase
-      .from("employees")
-      .select("id")
-      .eq("user_id", user?.id)
-      .single();
-
-    const { error } = await supabase
-      .from("stock_receipts")
-      .insert({
-        branch_id: formData.branch_id,
-        product_id: formData.product_id,
-        quantity: parseFloat(formData.quantity),
-        purchase_price: parseFloat(formData.purchase_price),
-        sale_price: parseFloat(formData.sale_price),
-        employee_id: employee?.id,
+    try {
+      await apiPost("/api/income", {
+        branch_id: Number(formData.branch_id),
+        items: [
+          {
+            product_id: Number(formData.product_id),
+            quantity: Number(formData.quantity),
+            purchase_price: Number(formData.purchase_price),
+            sale_price: Number(formData.sale_price),
+          },
+        ],
       });
-
-    if (error) {
+      toast.success("Приход успешно добавлен");
+      setFormData({ branch_id: "", product_id: "", quantity: "", purchase_price: "", sale_price: "" });
+      fetchIncomes();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка при добавлении прихода");
-      return;
     }
-
-    toast.success("Приход успешно добавлен");
-    setFormData({
-      branch_id: "",
-      product_id: "",
-      quantity: "",
-      purchase_price: "",
-      sale_price: "",
-    });
-    fetchReceipts();
   };
 
-  const handleEdit = (receipt: any) => {
-    setEditingId(receipt.id);
-    setEditData({
-      quantity: receipt.quantity,
-      purchase_price: receipt.purchase_price,
-      sale_price: receipt.sale_price,
-    });
-  };
-
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from("stock_receipts")
-      .update({
-        quantity: parseFloat(editData.quantity),
-        purchase_price: parseFloat(editData.purchase_price),
-        sale_price: parseFloat(editData.sale_price),
-      })
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Ошибка при обновлении");
-      return;
-    }
-
-    toast.success("Приход обновлен");
-    setEditingId(null);
-    fetchReceipts();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Вы уверены, что хотите удалить этот приход?")) return;
-
-    const { error } = await supabase
-      .from("stock_receipts")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    if (!confirm("Удалить приход?")) return;
+    try {
+      await apiDelete(`/api/income/${id}`);
+      toast.success("Приход удален");
+      fetchIncomes();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка при удалении");
-      return;
     }
-
-    toast.success("Приход удален");
-    fetchReceipts();
   };
+
+  const getProductName = (id: number) => products.find((product) => product.id === id)?.name || `#${id}`;
+  const getBranchName = (id: number) => branches.find((branch) => branch.id === id)?.name || `Филиал ${id}`;
 
   return (
     <div className="space-y-6">
@@ -182,78 +122,46 @@ export default function Income() {
           <form onSubmit={handleAdd} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 p-4 border rounded-lg bg-card">
             <div className="space-y-2">
               <Label htmlFor="branch">Филиал</Label>
-              <Select
-                value={formData.branch_id}
-                onValueChange={(value) => setFormData({ ...formData, branch_id: value })}
-              >
+              <Select value={formData.branch_id} onValueChange={(value) => setFormData({ ...formData, branch_id: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите филиал" />
                 </SelectTrigger>
                 <SelectContent>
                   {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
+                    <SelectItem key={branch.id} value={String(branch.id)}>
                       {branch.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="product">Товар</Label>
-              <Select
-                value={formData.product_id}
-                onValueChange={(value) => setFormData({ ...formData, product_id: value })}
-              >
+              <Select value={formData.product_id} onValueChange={(value) => setFormData({ ...formData, product_id: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите товар" />
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((product) => (
-                    <SelectItem key={product.id} value={product.id}>
+                    <SelectItem key={product.id} value={String(product.id)}>
                       {product.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="quantity">Количество</Label>
-              <Input
-                id="quantity"
-                type="number"
-                step="0.01"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                placeholder="0"
-              />
+              <Label>Количество</Label>
+              <Input type="number" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="purchase_price">Цена прихода</Label>
-              <Input
-                id="purchase_price"
-                type="number"
-                step="0.01"
-                value={formData.purchase_price}
-                onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
-                placeholder="0"
-              />
+              <Label>Цена закупки</Label>
+              <Input type="number" value={formData.purchase_price} onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })} />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="sale_price">Цена продажи</Label>
-              <Input
-                id="sale_price"
-                type="number"
-                step="0.01"
-                value={formData.sale_price}
-                onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })}
-                placeholder="0"
-              />
+              <Label>Цена продажи</Label>
+              <Input type="number" value={formData.sale_price} onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })} />
             </div>
-
             <div className="flex items-end">
               <Button type="submit" className="w-full">
                 Добавить приход
@@ -262,113 +170,43 @@ export default function Income() {
           </form>
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Филиал</TableHead>
-                  <TableHead>Товар</TableHead>
-                  <TableHead>Количество</TableHead>
-                  <TableHead>Цена прихода</TableHead>
-                  <TableHead>Цена продажи</TableHead>
-                  <TableHead>Сотрудник</TableHead>
-                  <TableHead>Дата</TableHead>
-                  <TableHead>Действия</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receipts.map((receipt) => (
-                  <TableRow key={receipt.id}>
-                    <TableCell>{receipt.branches?.name}</TableCell>
-                    <TableCell>{receipt.products?.name}</TableCell>
-                    <TableCell>
-                      {editingId === receipt.id ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editData.quantity}
-                          onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
-                          className="w-24"
-                        />
-                      ) : (
-                        receipt.quantity
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === receipt.id ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editData.purchase_price}
-                          onChange={(e) => setEditData({ ...editData, purchase_price: e.target.value })}
-                          className="w-24"
-                        />
-                      ) : (
-                        receipt.purchase_price
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === receipt.id ? (
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editData.sale_price}
-                          onChange={(e) => setEditData({ ...editData, sale_price: e.target.value })}
-                          className="w-24"
-                        />
-                      ) : (
-                        receipt.sale_price
-                      )}
-                    </TableCell>
-                    <TableCell>{receipt.employees?.name || "-"}</TableCell>
-                    <TableCell>
-                      {new Date(receipt.created_at).toLocaleDateString("ru-RU")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        {editingId === receipt.id ? (
-                          <>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleSave(receipt.id)}
-                            >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEditingId(null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleEdit(receipt)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleDelete(receipt.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
+        <TabsContent value="history">
+          <Card className="p-4">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Дата</TableHead>
+                    <TableHead>Филиал</TableHead>
+                    <TableHead>Товары</TableHead>
+                    <TableHead className="w-[80px]">Действия</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {incomes.map((income) => (
+                    <TableRow key={income.id}>
+                      <TableCell>{new Date(income.created_at).toLocaleString('ru-RU')}</TableCell>
+                      <TableCell>{getBranchName(income.branch_id)}</TableCell>
+                      <TableCell>
+                        <ul className="text-sm space-y-1">
+                          {income.items.map((item) => (
+                            <li key={item.id}>
+                              {getProductName(item.product_id)} — {item.quantity} шт. по {item.purchase_price} ₸ / {item.sale_price} ₸
+                            </li>
+                          ))}
+                        </ul>
+                      </TableCell>
+                      <TableCell>
+                        <Button size="icon" variant="ghost" onClick={() => handleDelete(income.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

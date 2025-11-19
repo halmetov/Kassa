@@ -4,23 +4,21 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { getCurrentUser, getEmployeeByUserId } from "@/lib/auth";
+import { AuthUser, getCurrentUser } from "@/lib/auth";
 
 export const Layout = () => {
   const [open, setOpen] = useState(true);
-  const [employee, setEmployee] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const checkAuth = async () => {
-      const user = await getCurrentUser();
-      if (!user) {
+      const authUser = await getCurrentUser();
+      if (!authUser) {
         navigate('/auth');
         return;
       }
-      
-      const emp = await getEmployeeByUserId(user.id);
-      setEmployee(emp);
+      setUser(authUser);
     };
     
     checkAuth();
@@ -29,7 +27,7 @@ export const Layout = () => {
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar employee={employee} />
+        <AppSidebar user={user} />
         <main className="flex-1 flex flex-col">
           <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6 lg:hidden">
             <Button

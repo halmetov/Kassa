@@ -11,6 +11,9 @@ class SaleSummary(BaseModel):
     branch: str
     total: float
     payment_type: str
+    cash: float
+    kaspi: float
+    credit: float
 
 
 class DailyReport(BaseModel):
@@ -34,3 +37,25 @@ class ReportsResponse(BaseModel):
     by_day: List[DailyReport]
     by_seller: List[StaffReport]
     by_branch: List[BranchReport]
+
+
+class PaymentBreakdown(BaseModel):
+    cash: float
+    kaspi: float
+    credit: float
+
+
+class ProductPerformance(BaseModel):
+    product_id: int
+    name: str
+    quantity: float
+    revenue: float
+
+
+class AnalyticsResponse(BaseModel):
+    sales_by_date: List[DailyReport]
+    payment_breakdown: PaymentBreakdown
+    top_products: List[ProductPerformance]
+    total_sales: float
+    total_debt: float
+    total_receipts: int

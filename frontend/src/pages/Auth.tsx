@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, login, register } from "@/lib/auth";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -32,45 +31,14 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        // Login
-        const email = `${username}@pos.local`;
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
+        await login(username, password);
         toast.success("Вход выполнен успешно");
         navigate('/');
       } else {
-        // Signup
-        const email = `${username}@pos.local`;
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { name },
-          },
-        });
-
-        if (authError) throw authError;
-
-        if (authData.user) {
-          const { error: empError } = await supabase
-            .from('employees')
-            .insert({
-              user_id: authData.user.id,
-              name,
-              username,
-              role: 'employee',
-            });
-
-          if (empError) throw empError;
-
-          toast.success("Регистрация успешна");
-          navigate('/');
-        }
+        await register({ username, password, name });
+        await login(username, password);
+        toast.success("Регистрация успешна");
+        navigate('/');
       }
     } catch (error: any) {
       toast.error(error.message || "Ошибка аутентификации");

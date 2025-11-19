@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -21,12 +19,33 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import { apiGet, apiPost } from "@/api/client";
+
+type SaleDetailItem = {
+  id: number;
+  product_id: number;
+  quantity: number;
+  price: number;
+  product_name?: string | null;
+  product_unit?: string | null;
+};
+
+type SaleDetail = {
+  id: number;
+  created_at: string;
+  branch_name?: string | null;
+  seller_name?: string | null;
+  total: number;
+  credit: number;
+  client_name?: string | null;
+  client_id?: number | null;
+  items: SaleDetailItem[];
+};
 
 export default function Returns() {
   const [searchSaleId, setSearchSaleId] = useState("");
-  const [sale, setSale] = useState<any>(null);
-  const [saleItems, setSaleItems] = useState<any[]>([]);
-  const [returnItems, setReturnItems] = useState<Map<string, number>>(new Map());
+  const [sale, setSale] = useState<SaleDetail | null>(null);
+  const [returnItems, setReturnItems] = useState<Map<number, number>>(new Map());
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const searchSale = async () => {
@@ -34,113 +53,60 @@ export default function Returns() {
       toast.error("Введите ID чека");
       return;
     }
-
-    const { data: saleData } = await supabase
-      .from('sales')
-      .select(`
-        *,
-        employees (name),
-        branches (name),
-        clients (name, id)
-      `)
-      .eq('id', searchSaleId)
-      .maybeSingle();
-
-    if (!saleData) {
-      toast.error("Чек не найден");
-      return;
-    }
-
-    setSale(saleData);
-
-    const { data: itemsData } = await supabase
-      .from('sale_items')
-      .select(`
-        *,
-        products (name, unit)
-      `)
-      .eq('sale_id', searchSaleId);
-
-    if (itemsData) {
-      setSaleItems(itemsData);
+    try {
+      const saleData = await apiGet<SaleDetail>(`/api/sales/${searchSaleId.trim()}`);
+      setSale(saleData);
       setReturnItems(new Map());
+    } catch (error) {
+      console.error(error);
+      toast.error("Чек не найден");
     }
   };
 
-  const updateReturnQuantity = (itemId: string, maxQty: number, value: number) => {
+  const updateReturnQuantity = (itemId: number, maxQty: number, value: number) => {
     const newMap = new Map(returnItems);
     const qty = Math.min(Math.max(0, value), maxQty);
-    
     if (qty > 0) {
       newMap.set(itemId, qty);
     } else {
       newMap.delete(itemId);
     }
-    
     setReturnItems(newMap);
   };
 
   const getTotalReturnAmount = () => {
-    return saleItems.reduce((sum, item) => {
+    if (!sale) return 0;
+    return sale.items.reduce((sum, item) => {
       const returnQty = returnItems.get(item.id) || 0;
-      return sum + (returnQty * parseFloat(item.price));
+      return sum + returnQty * item.price;
     }, 0);
   };
 
   const handleReturn = async () => {
+    if (!sale) return;
     if (returnItems.size === 0) {
       toast.error("Выберите товары для возврата");
       return;
     }
-
     try {
-      // Return items to stock
       for (const [itemId, returnQty] of returnItems.entries()) {
-        const item = saleItems.find(i => i.id === itemId);
-        if (item) {
-          const { data: product } = await supabase
-            .from('products')
-            .select('quantity')
-            .eq('id', item.product_id)
-            .single();
-          
-          if (product) {
-            await supabase
-              .from('products')
-              .update({ quantity: (product.quantity || 0) + returnQty })
-              .eq('id', item.product_id);
-          }
-        }
+        const item = sale.items.find((i) => i.id === itemId);
+        if (!item) continue;
+        await apiPost("/api/returns", {
+          sale_id: sale.id,
+          product_id: item.product_id,
+          quantity: returnQty,
+          amount: returnQty * item.price,
+        });
       }
-
-      // Update client debt if credit was used
-      if (sale.credit_amount > 0 && sale.client_id) {
-        const returnAmount = getTotalReturnAmount();
-        const creditPortion = (returnAmount / parseFloat(sale.total_amount)) * parseFloat(sale.credit_amount);
-        
-        const { data: client } = await supabase
-          .from('clients')
-          .select('debt')
-          .eq('id', sale.client_id)
-          .single();
-        
-        if (client) {
-          await supabase
-            .from('clients')
-            .update({ debt: Math.max(0, (client.debt || 0) - creditPortion) })
-            .eq('id', sale.client_id);
-        }
-      }
-
       toast.success("Возврат выполнен успешно");
       setSale(null);
-      setSaleItems([]);
       setReturnItems(new Map());
       setSearchSaleId("");
       setShowConfirmModal(false);
     } catch (error) {
-      toast.error("Ошибка при возврате");
       console.error(error);
+      toast.error("Ошибка при возврате");
     }
   };
 
@@ -169,20 +135,17 @@ export default function Returns() {
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <span className="text-muted-foreground">Дата:</span>{" "}
-                {new Date(sale.created_at).toLocaleString('ru-RU')}
+                <span className="text-muted-foreground">Дата:</span> {new Date(sale.created_at).toLocaleString('ru-RU')}
               </div>
               <div>
-                <span className="text-muted-foreground">Сотрудник:</span>{" "}
-                {sale.employees?.name || "-"}
+                <span className="text-muted-foreground">Сотрудник:</span> {sale.seller_name || "-"}
               </div>
               <div>
-                <span className="text-muted-foreground">Филиал:</span>{" "}
-                {sale.branches?.name || "-"}
+                <span className="text-muted-foreground">Филиал:</span> {sale.branch_name || "-"}
               </div>
               <div>
-                <span className="text-muted-foreground">Сумма:</span>{" "}
-                <span className="font-bold">{parseFloat(sale.total_amount).toFixed(2)} ₸</span>
+                <span className="text-muted-foreground">Сумма:</span>
+                <span className="font-bold"> {sale.total.toFixed(2)} ₸</span>
               </div>
             </div>
 
@@ -197,34 +160,27 @@ export default function Returns() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {saleItems.map((item) => {
+                {sale.items.map((item) => {
                   const returnQty = returnItems.get(item.id) || 0;
-                  const returnAmount = returnQty * parseFloat(item.price);
-                  
+                  const returnAmount = returnQty * item.price;
                   return (
                     <TableRow key={item.id}>
-                      <TableCell>{item.products?.name}</TableCell>
+                      <TableCell>{item.product_name || `ID ${item.product_id}`}</TableCell>
                       <TableCell className="text-right">
-                        {item.quantity} {item.products?.unit}
+                        {item.quantity} {item.product_unit || "шт"}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {parseFloat(item.price).toFixed(2)} ₸
-                      </TableCell>
+                      <TableCell className="text-right">{item.price.toFixed(2)} ₸</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           min="0"
                           max={item.quantity}
                           value={returnQty}
-                          onChange={(e) => 
-                            updateReturnQuantity(item.id, item.quantity, parseInt(e.target.value) || 0)
-                          }
+                          onChange={(e) => updateReturnQuantity(item.id, item.quantity, parseInt(e.target.value) || 0)}
                           className="w-24 ml-auto"
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {returnAmount.toFixed(2)} ₸
-                      </TableCell>
+                      <TableCell className="text-right font-medium">{returnAmount.toFixed(2)} ₸</TableCell>
                     </TableRow>
                   );
                 })}
@@ -232,13 +188,8 @@ export default function Returns() {
             </Table>
 
             <div className="flex justify-between items-center border-t pt-4">
-              <div className="text-xl font-bold">
-                Итого к возврату: {getTotalReturnAmount().toFixed(2)} ₸
-              </div>
-              <Button
-                onClick={() => setShowConfirmModal(true)}
-                disabled={returnItems.size === 0}
-              >
+              <div className="text-xl font-bold">Итого к возврату: {getTotalReturnAmount().toFixed(2)} ₸</div>
+              <Button onClick={() => setShowConfirmModal(true)} disabled={returnItems.size === 0}>
                 Выполнить возврат
               </Button>
             </div>
@@ -254,16 +205,16 @@ export default function Returns() {
 
           <div className="space-y-4">
             <p>Вы уверены, что хотите выполнить возврат на сумму {getTotalReturnAmount().toFixed(2)} ₸?</p>
-            
             <ul className="text-sm space-y-1">
-              {Array.from(returnItems.entries()).map(([itemId, qty]) => {
-                const item = saleItems.find(i => i.id === itemId);
-                return (
-                  <li key={itemId}>
-                    • {item?.products?.name}: {qty} {item?.products?.unit}
-                  </li>
-                );
-              })}
+              {sale &&
+                Array.from(returnItems.entries()).map(([itemId, qty]) => {
+                  const item = sale.items.find((i) => i.id === itemId);
+                  return (
+                    <li key={itemId}>
+                      • {item?.product_name || `ID ${item?.product_id}`}: {qty} {item?.product_unit || "шт"}
+                    </li>
+                  );
+                })}
             </ul>
           </div>
 

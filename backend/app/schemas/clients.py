@@ -10,12 +10,13 @@ class ClientBase(BaseModel):
 
 
 class ClientCreate(ClientBase):
-    pass
+    total_debt: float = 0
 
 
 class ClientUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
+    total_debt: Optional[float] = None
 
 
 class Client(ClientBase):

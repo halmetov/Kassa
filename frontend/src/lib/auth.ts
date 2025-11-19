@@ -1,22 +1,109 @@
-import { supabase } from "@/integrations/supabase/client";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const ACCESS_TOKEN_KEY = "kassa_access_token";
+const REFRESH_TOKEN_KEY = "kassa_refresh_token";
 
-export const getCurrentUser = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user || null;
+export type AuthUser = {
+  id: number;
+  login: string;
+  name: string;
+  role: string;
+  active: boolean;
 };
 
-export const getEmployeeByUserId = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  
-  if (error) throw error;
+export function getAccessToken() {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+function setTokens(access: string, refresh: string) {
+  localStorage.setItem(ACCESS_TOKEN_KEY, access);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
+}
+
+export function clearTokens() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export async function login(username: string, password: string) {
+  const body = new URLSearchParams();
+  body.append("username", username);
+  body.append("password", password);
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Неверный логин или пароль");
+  }
+  const data = await response.json();
+  setTokens(data.access_token, data.refresh_token);
+  return getCurrentUser();
+}
+
+export async function register(payload: { username: string; password: string; name?: string }) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Ошибка регистрации");
+  }
+  return response.json();
+}
+
+export async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!response.ok) {
+    clearTokens();
+    return null;
+  }
+  const data = await response.json();
+  setTokens(data.access_token, data.refresh_token);
   return data;
-};
+}
 
-export const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-};
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const token = getAccessToken();
+  if (!token) return null;
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return getCurrentUser();
+    }
+    return null;
+  }
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Не удалось получить профиль");
+  }
+  return response.json();
+}
+
+export function signOut() {
+  clearTokens();
+}

@@ -1,3 +1,5 @@
+from datetime import date, datetime, time
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,8 +14,17 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[sales_schema.Sale])
-async def list_sales(db: Session = Depends(get_db)):
-    result = db.execute(select(Sale).order_by(Sale.created_at.desc()))
+async def list_sales(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    query = select(Sale).order_by(Sale.created_at.desc())
+    if start_date:
+        query = query.where(Sale.created_at >= datetime.combine(start_date, time.min))
+    if end_date:
+        query = query.where(Sale.created_at <= datetime.combine(end_date, time.max))
+    result = db.execute(query)
     sales = result.scalars().unique().all()
     for sale in sales:
         db.refresh(sale, attribute_names=["items"])
@@ -66,3 +77,40 @@ async def create_sale(
     db.refresh(sale)
     db.refresh(sale, attribute_names=["items"])
     return sale
+
+
+@router.get("/{sale_id}", response_model=sales_schema.SaleDetail)
+async def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
+    sale = db.get(Sale, sale_id)
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    db.refresh(sale, attribute_names=["items", "seller", "branch", "client"])
+    items: list[sales_schema.SaleItemDetail] = []
+    for item in sale.items:
+        product = db.get(Product, item.product_id)
+        items.append(
+            sales_schema.SaleItemDetail(
+                id=item.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.price,
+                product_name=product.name if product else None,
+                product_unit=product.unit if product else None,
+            )
+        )
+    return sales_schema.SaleDetail(
+        id=sale.id,
+        branch_id=sale.branch_id,
+        branch_name=sale.branch.name if sale.branch else None,
+        seller_id=sale.seller_id,
+        seller_name=sale.seller.name if sale.seller else None,
+        client_id=sale.client_id,
+        client_name=sale.client.name if sale.client else None,
+        cash=sale.cash,
+        kaspi=sale.kaspi,
+        credit=sale.credit,
+        payment_type=sale.payment_type,
+        total=sale.total,
+        created_at=sale.created_at,
+        items=items,
+    )

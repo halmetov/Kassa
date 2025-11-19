@@ -33,12 +33,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
 
 @router.post("/register", response_model=auth_schema.AuthUser)
-async def register_user(payload: auth_schema.LoginRequest, db: Session = Depends(get_db)):
+async def register_user(payload: auth_schema.RegisterRequest, db: Session = Depends(get_db)):
     existing = get_user_by_login(db, payload.username)
     if existing:
         raise HTTPException(status_code=400, detail="Login already exists")
     user = User(
-        name=payload.username,
+        name=payload.name or payload.username,
         login=payload.username,
         password_hash=hash_password(payload.password),
         role="seller",
