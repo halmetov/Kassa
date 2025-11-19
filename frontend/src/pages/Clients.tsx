@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/table";
 
 export default function Clients() {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<{ id: number; name: string; phone?: string | null; total_debt: number }[]>([]);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newDebt, setNewDebt] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editDebt, setEditDebt] = useState("");
@@ -29,81 +29,68 @@ export default function Clients() {
   }, []);
 
   const fetchClients = async () => {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await apiGet<{ id: number; name: string; phone?: string | null; total_debt: number }[]>("/api/clients");
+      setClients(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки клиентов");
-      return;
     }
-    setClients(data || []);
   };
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
 
-    const { error } = await supabase
-      .from('clients')
-      .insert({ 
+    try {
+      await apiPost("/api/clients", {
         name: newName.trim(),
         phone: newPhone.trim() || null,
-        debt: newDebt ? parseFloat(newDebt) : 0
+        total_debt: newDebt ? parseFloat(newDebt) : 0,
       });
-
-    if (error) {
+      toast.success("Клиент добавлен");
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка добавления клиента");
       return;
     }
-
-    toast.success("Клиент добавлен");
     setNewName("");
     setNewPhone("");
     setNewDebt("");
     fetchClients();
   };
 
-  const handleEdit = (client: any) => {
+  const handleEdit = (client: { id: number; name: string; phone?: string | null; total_debt: number }) => {
     setEditingId(client.id);
     setEditName(client.name);
     setEditPhone(client.phone || "");
-    setEditDebt(client.debt?.toString() || "0");
+    setEditDebt(client.total_debt?.toString() || "0");
   };
 
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from('clients')
-      .update({ 
-        name: editName, 
+  const handleSave = async (id: number) => {
+    try {
+      await apiPut(`/api/clients/${id}`, {
+        name: editName,
         phone: editPhone || null,
-        debt: editDebt ? parseFloat(editDebt) : 0
-      })
-      .eq('id', id);
-
-    if (error) {
+        total_debt: editDebt ? parseFloat(editDebt) : 0,
+      });
+      toast.success("Клиент обновлен");
+      setEditingId(null);
+      fetchClients();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка обновления");
-      return;
     }
-
-    toast.success("Клиент обновлен");
-    setEditingId(null);
-    fetchClients();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    try {
+      await apiDelete(`/api/clients/${id}`);
+      toast.success("Клиент удален");
+      fetchClients();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка удаления");
-      return;
     }
-
-    toast.success("Клиент удален");
-    fetchClients();
   };
 
   return (
@@ -180,8 +167,8 @@ export default function Clients() {
                       placeholder="Долг"
                     />
                   ) : (
-                    <span className={client.debt > 0 ? "text-destructive" : ""}>
-                      {client.debt || 0}
+                    <span className={client.total_debt > 0 ? "text-destructive" : ""}>
+                      {client.total_debt || 0}
                     </span>
                   )}
                 </TableCell>

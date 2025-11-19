@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import {
   Select,
@@ -18,11 +17,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AlertCircle } from "lucide-react";
+import { apiGet } from "@/api/client";
+import { toast } from "sonner";
+
+type Branch = { id: number; name: string; active: boolean };
+type StockItem = { id: number; product: string; quantity: number; limit?: number | null };
 
 export default function Warehouse() {
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
-  const [stock, setStock] = useState<any[]>([]);
+  const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -36,40 +40,35 @@ export default function Warehouse() {
   }, [selectedBranch]);
 
   const fetchBranches = async () => {
-    const { data } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-    
-    if (data) {
-      setBranches(data);
-      if (data.length > 0) {
-        setSelectedBranch(data[0].id);
+    try {
+      const data = await apiGet<Branch[]>("/api/branches");
+      const active = data.filter((branch) => branch.active);
+      setBranches(active);
+      if (active.length > 0) {
+        setSelectedBranch(String(active[0].id));
       }
+    } catch (error) {
+      console.error(error);
+      toast.error("Ошибка загрузки филиалов");
     }
   };
 
   const fetchStock = async () => {
     setLoading(true);
-    
-    const { data: products } = await supabase
-      .from('products')
-      .select(`
-        *,
-        categories (name)
-      `)
-      .order('name');
-
-    if (products) {
-      setStock(products);
+    try {
+      const data = await apiGet<StockItem[]>(`/api/branches/${selectedBranch}/stock`);
+      setStock(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Ошибка загрузки склада");
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
-  const isLowStock = (product: any) => {
-    return product.quantity <= (product.limit_quantity || 0);
+  const isLowStock = (item: StockItem) => {
+    const limit = item.limit ?? 0;
+    return item.quantity <= limit;
   };
 
   return (
@@ -87,8 +86,8 @@ export default function Warehouse() {
               <SelectValue placeholder="Выберите филиал" />
             </SelectTrigger>
             <SelectContent>
-              {branches.map(branch => (
-                <SelectItem key={branch.id} value={branch.id}>
+              {branches.map((branch) => (
+                <SelectItem key={branch.id} value={String(branch.id)}>
                   {branch.name}
                 </SelectItem>
               ))}
@@ -97,44 +96,25 @@ export default function Warehouse() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Загрузка...
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Товар</TableHead>
-                <TableHead>Категория</TableHead>
-                <TableHead>Штрихкод</TableHead>
                 <TableHead className="text-right">Количество</TableHead>
                 <TableHead className="text-right">Лимит</TableHead>
-                <TableHead className="text-right">Цена продажи</TableHead>
                 <TableHead>Статус</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stock.map((product) => (
-                <TableRow 
-                  key={product.id}
-                  className={isLowStock(product) ? "bg-destructive/10" : ""}
-                >
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.categories?.name || "-"}</TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {product.barcode || "-"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {product.quantity || 0} {product.unit}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {product.limit_quantity || 0}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {product.sale_price} ₸
-                  </TableCell>
+              {stock.map((item) => (
+                <TableRow key={item.id} className={isLowStock(item) ? "bg-destructive/10" : ""}>
+                  <TableCell className="font-medium">{item.product}</TableCell>
+                  <TableCell className="text-right">{item.quantity}</TableCell>
+                  <TableCell className="text-right">{item.limit ?? 0}</TableCell>
                   <TableCell>
-                    {isLowStock(product) && (
+                    {isLowStock(item) && (
                       <div className="flex items-center gap-1 text-destructive">
                         <AlertCircle className="h-4 w-4" />
                         <span className="text-sm">Мало на складе</span>

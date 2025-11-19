@@ -20,6 +20,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(LoginRequest):
+    name: str | None = None
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/table";
 
 export default function Categories() {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [newCategory, setNewCategory] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
 
   useEffect(() => {
@@ -25,69 +25,56 @@ export default function Categories() {
   }, []);
 
   const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await apiGet<{ id: number; name: string }[]>("/api/categories");
+      setCategories(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки категорий");
-      return;
     }
-    setCategories(data || []);
   };
 
   const handleAdd = async () => {
     if (!newCategory.trim()) return;
 
-    const { error } = await supabase
-      .from('categories')
-      .insert({ name: newCategory.trim() });
-
-    if (error) {
+    try {
+      await apiPost("/api/categories", { name: newCategory.trim() });
+      toast.success("Категория добавлена");
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка добавления категории");
       return;
     }
-
-    toast.success("Категория добавлена");
     setNewCategory("");
     fetchCategories();
   };
 
-  const handleEdit = (id: string, name: string) => {
+  const handleEdit = (id: number, name: string) => {
     setEditingId(id);
     setEditValue(name);
   };
 
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from('categories')
-      .update({ name: editValue })
-      .eq('id', id);
-
-    if (error) {
+  const handleSave = async (id: number) => {
+    try {
+      await apiPut(`/api/categories/${id}`, { name: editValue });
+      toast.success("Категория обновлена");
+      setEditingId(null);
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка обновления");
-      return;
     }
-
-    toast.success("Категория обновлена");
-    setEditingId(null);
-    fetchCategories();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    try {
+      await apiDelete(`/api/categories/${id}`);
+      toast.success("Категория удалена");
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка удаления");
-      return;
     }
-
-    toast.success("Категория удалена");
-    fetchCategories();
   };
 
   return (

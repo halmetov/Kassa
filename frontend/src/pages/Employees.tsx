@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,161 +21,112 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
+
+type Employee = {
+  id: number;
+  name: string;
+  login: string;
+  role: "admin" | "seller";
+  active: boolean;
+};
 
 export default function Employees() {
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    username: "",
+    login: "",
     password: "",
-    role: "employee" as "admin" | "employee",
-    branch_id: "",
-    is_active: true,
+    role: "seller",
+    active: true,
   });
-
-  const [editData, setEditData] = useState<any>({});
+  const [editData, setEditData] = useState({
+    name: "",
+    role: "seller",
+    active: true,
+    password: "",
+  });
 
   useEffect(() => {
     fetchEmployees();
-    fetchBranches();
   }, []);
 
   const fetchEmployees = async () => {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*, branches(name)')
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await apiGet<Employee[]>("/api/users");
+      setEmployees(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки сотрудников");
-      return;
     }
-    setEmployees(data || []);
-  };
-
-  const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from('branches')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-
-    if (error) {
-      toast.error("Ошибка загрузки филиалов");
-      return;
-    }
-    setBranches(data || []);
   };
 
   const handleAdd = async () => {
-    if (!formData.name.trim() || !formData.username.trim() || !formData.password.trim()) {
+    if (!formData.name.trim() || !formData.login.trim() || !formData.password.trim()) {
       toast.error("Заполните все поля");
       return;
     }
-
-    const email = `${formData.username}@pos.local`;
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password: formData.password,
-      options: {
-        data: { name: formData.name },
-      },
-    });
-
-    if (authError) {
-      toast.error("Ошибка создания пользователя");
-      return;
-    }
-
-    if (authData.user) {
-      const { error } = await supabase.from('employees').insert({
-        user_id: authData.user.id,
+    try {
+      await apiPost("/api/users", {
         name: formData.name.trim(),
-        username: formData.username.trim(),
+        login: formData.login.trim(),
+        password: formData.password,
         role: formData.role,
-        branch_id: formData.branch_id || null,
-        is_active: formData.is_active,
+        active: formData.active,
       });
-
-      if (error) {
-        toast.error("Ошибка добавления сотрудника");
-        return;
-      }
-
       toast.success("Сотрудник добавлен");
-      setFormData({
-        name: "",
-        username: "",
-        password: "",
-        role: "employee",
-        branch_id: "",
-        is_active: true,
-      });
+      setFormData({ name: "", login: "", password: "", role: "seller", active: true });
       fetchEmployees();
+    } catch (error) {
+      console.error(error);
+      toast.error("Ошибка добавления сотрудника");
     }
   };
 
-  const handleEdit = (employee: any) => {
+  const handleEdit = (employee: Employee) => {
     setEditingId(employee.id);
-    setEditData({
-      name: employee.name,
-      username: employee.username,
-      role: employee.role,
-      branch_id: employee.branch_id || "",
-      is_active: employee.is_active,
-    });
+    setEditData({ name: employee.name, role: employee.role, active: employee.active, password: "" });
   };
 
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from('employees')
-      .update({
+  const handleSave = async (id: number) => {
+    try {
+      await apiPut(`/api/users/${id}`, {
         name: editData.name,
-        username: editData.username,
         role: editData.role,
-        branch_id: editData.branch_id || null,
-        is_active: editData.is_active,
-      })
-      .eq('id', id);
-
-    if (error) {
+        active: editData.active,
+        password: editData.password || undefined,
+      });
+      toast.success("Сотрудник обновлен");
+      setEditingId(null);
+      fetchEmployees();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка обновления");
-      return;
     }
-
-    toast.success("Сотрудник обновлен");
-    setEditingId(null);
-    fetchEmployees();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('employees')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    try {
+      await apiDelete(`/api/users/${id}`);
+      toast.success("Сотрудник удален");
+      fetchEmployees();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка удаления");
-      return;
     }
-
-    toast.success("Сотрудник удален");
-    fetchEmployees();
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Сотрудники</h1>
-        <p className="text-muted-foreground">Управление сотрудниками</p>
+        <p className="text-muted-foreground">Управление пользователями системы</p>
       </div>
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Добавить сотрудника</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           <div>
             <Label>Имя</Label>
             <Input
@@ -188,8 +138,8 @@ export default function Employees() {
           <div>
             <Label>Логин</Label>
             <Input
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              value={formData.login}
+              onChange={(e) => setFormData({ ...formData, login: e.target.value })}
               placeholder="Логин"
             />
           </div>
@@ -204,179 +154,107 @@ export default function Employees() {
           </div>
           <div>
             <Label>Роль</Label>
-            <Select
-              value={formData.role}
-              onValueChange={(value: "admin" | "employee") => setFormData({ ...formData, role: value })}
-            >
+            <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="employee">Сотрудник</SelectItem>
-                <SelectItem value="admin">Админ</SelectItem>
+                <SelectItem value="admin">Администратор</SelectItem>
+                <SelectItem value="seller">Продавец</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Филиал</Label>
-            <Select
-              value={formData.branch_id}
-              onValueChange={(value) => setFormData({ ...formData, branch_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Выберите филиал" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
-              <Label>Активен</Label>
-            </div>
+          <div className="flex items-center gap-2">
+            <Label>Активен</Label>
+            <Switch checked={formData.active} onCheckedChange={(checked) => setFormData({ ...formData, active: checked })} />
           </div>
         </div>
-        <Button onClick={handleAdd}>Добавить сотрудника</Button>
+        <Button onClick={handleAdd}>Добавить</Button>
       </Card>
 
       <Card className="p-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Имя</TableHead>
-              <TableHead>Логин</TableHead>
-              <TableHead>Роль</TableHead>
-              <TableHead>Филиал</TableHead>
-              <TableHead>Активность</TableHead>
-              <TableHead className="w-[100px]">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.map((emp) => (
-              <TableRow key={emp.id}>
-                <TableCell>
-                  {editingId === emp.id ? (
-                    <Input
-                      value={editData.name}
-                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                    />
-                  ) : (
-                    emp.name
-                  )}
-                </TableCell>
-                <TableCell>
-                  {editingId === emp.id ? (
-                    <Input
-                      value={editData.username}
-                      onChange={(e) => setEditData({ ...editData, username: e.target.value })}
-                    />
-                  ) : (
-                    emp.username
-                  )}
-                </TableCell>
-                <TableCell>
-                  {editingId === emp.id ? (
-                    <Select
-                      value={editData.role}
-                      onValueChange={(value) => setEditData({ ...editData, role: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="employee">Сотрудник</SelectItem>
-                        <SelectItem value="admin">Админ</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span>{emp.role === 'admin' ? 'Админ' : 'Сотрудник'}</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {editingId === emp.id ? (
-                    <Select
-                      value={editData.branch_id || ""}
-                      onValueChange={(value) => setEditData({ ...editData, branch_id: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите филиал" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    emp.branches?.name || "-"
-                  )}
-                </TableCell>
-                <TableCell>
-                  {editingId === emp.id ? (
-                    <Switch
-                      checked={editData.is_active}
-                      onCheckedChange={(checked) => setEditData({ ...editData, is_active: checked })}
-                    />
-                  ) : (
-                    <span className={emp.is_active ? "text-success" : "text-muted-foreground"}>
-                      {emp.is_active ? "Активен" : "Неактивен"}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    {editingId === emp.id ? (
-                      <>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleSave(emp.id)}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEditingId(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleEdit(emp)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDelete(emp.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Имя</TableHead>
+                <TableHead>Логин</TableHead>
+                <TableHead>Роль</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead className="w-[120px]">Действия</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {employees.map((employee) => (
+                <TableRow key={employee.id}>
+                  <TableCell>
+                    {editingId === employee.id ? (
+                      <Input value={editData.name} onChange={(e) => setEditData({ ...editData, name: e.target.value })} />
+                    ) : (
+                      employee.name
+                    )}
+                  </TableCell>
+                  <TableCell>{employee.login}</TableCell>
+                  <TableCell>
+                    {editingId === employee.id ? (
+                      <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Администратор</SelectItem>
+                          <SelectItem value="seller">Продавец</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      employee.role === 'admin' ? 'Администратор' : 'Продавец'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === employee.id ? (
+                      <div className="flex items-center gap-2">
+                        <Switch checked={editData.active} onCheckedChange={(checked) => setEditData({ ...editData, active: checked })} />
+                        <Input
+                          type="password"
+                          placeholder="Новый пароль"
+                          value={editData.password}
+                          onChange={(e) => setEditData({ ...editData, password: e.target.value })}
+                        />
+                      </div>
+                    ) : (
+                      <span className={employee.active ? "text-success" : "text-muted-foreground"}>
+                        {employee.active ? "Активен" : "Заблокирован"}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      {editingId === employee.id ? (
+                        <>
+                          <Button size="icon" variant="ghost" onClick={() => handleSave(employee.id)}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="icon" variant="ghost" onClick={() => handleEdit(employee)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDelete(employee.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
     </div>
   );

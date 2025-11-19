@@ -2,7 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import routes_auth, routes_branches, routes_categories, routes_clients, routes_income, routes_products, routes_reports, routes_returns, routes_sales, routes_users
+from app.api import (
+    routes_auth,
+    routes_branches,
+    routes_categories,
+    routes_clients,
+    routes_income,
+    routes_products,
+    routes_reports,
+    routes_returns,
+    routes_sales,
+    routes_users,
+)
 from app.core.config import get_settings
 
 settings = get_settings()

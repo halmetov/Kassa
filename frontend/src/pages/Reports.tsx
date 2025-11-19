@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,48 +18,70 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Eye } from "lucide-react";
+import { apiGet } from "@/api/client";
+import { toast } from "sonner";
+
+type SaleSummary = {
+  id: number;
+  created_at: string;
+  seller: string;
+  branch: string;
+  total: number;
+  payment_type: string;
+  cash: number;
+  kaspi: number;
+  credit: number;
+};
+
+type SaleDetailItem = {
+  id: number;
+  product_id: number;
+  quantity: number;
+  price: number;
+  product_name?: string | null;
+  product_unit?: string | null;
+};
+
+type SaleDetail = {
+  id: number;
+  created_at: string;
+  branch_name?: string | null;
+  seller_name?: string | null;
+  client_name?: string | null;
+  total: number;
+  cash: number;
+  kaspi: number;
+  credit: number;
+  items: SaleDetailItem[];
+};
 
 export default function Reports() {
-  const [sales, setSales] = useState<any[]>([]);
+  const [sales, setSales] = useState<SaleSummary[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [selectedSale, setSelectedSale] = useState<any>(null);
-  const [saleItems, setSaleItems] = useState<any[]>([]);
+  const [selectedSale, setSelectedSale] = useState<SaleDetail | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 30);
-    
     setEndDate(end.toISOString().split('T')[0]);
     setStartDate(start.toISOString().split('T')[0]);
-    
     fetchSales(start, end);
   }, []);
 
   const fetchSales = async (start?: Date, end?: Date) => {
-    let query = supabase
-      .from('sales')
-      .select(`
-        *,
-        employees (name),
-        branches (name),
-        clients (name)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (start) {
-      query = query.gte('created_at', start.toISOString());
+    try {
+      const params = new URLSearchParams();
+      if (start) params.set("start_date", start.toISOString().split('T')[0]);
+      if (end) params.set("end_date", end.toISOString().split('T')[0]);
+      const data = await apiGet<{ sales: SaleSummary[] }>(`/api/reports/summary${params.toString() ? `?${params.toString()}` : ""}`);
+      setSales(data.sales);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить отчеты");
     }
-    if (end) {
-      const endOfDay = new Date(end);
-      endOfDay.setHours(23, 59, 59, 999);
-      query = query.lte('created_at', endOfDay.toISOString());
-    }
-
-    const { data } = await query;
-    if (data) setSales(data);
   };
 
   const handleFilter = () => {
@@ -69,36 +90,21 @@ export default function Reports() {
     }
   };
 
-  const viewDetails = async (sale: any) => {
-    setSelectedSale(sale);
-    
-    const { data } = await supabase
-      .from('sale_items')
-      .select(`
-        *,
-        products (name, unit)
-      `)
-      .eq('sale_id', sale.id);
-    
-    if (data) setSaleItems(data);
-    setShowDetailsModal(true);
+  const viewDetails = async (sale: SaleSummary) => {
+    try {
+      const detail = await apiGet<SaleDetail>(`/api/sales/${sale.id}`);
+      setSelectedSale(detail);
+      setShowDetailsModal(true);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить детали продажи");
+    }
   };
 
-  const getTotalSales = () => {
-    return sales.reduce((sum, sale) => sum + parseFloat(sale.total_amount), 0);
-  };
-
-  const getTotalCash = () => {
-    return sales.reduce((sum, sale) => sum + parseFloat(sale.cash_amount || 0), 0);
-  };
-
-  const getTotalCard = () => {
-    return sales.reduce((sum, sale) => sum + parseFloat(sale.card_amount || 0), 0);
-  };
-
-  const getTotalCredit = () => {
-    return sales.reduce((sum, sale) => sum + parseFloat(sale.credit_amount || 0), 0);
-  };
+  const getTotalSales = () => sales.reduce((sum, sale) => sum + sale.total, 0);
+  const getTotalCash = () => sales.reduce((sum, sale) => sum + sale.cash, 0);
+  const getTotalCard = () => sales.reduce((sum, sale) => sum + sale.kaspi, 0);
+  const getTotalCredit = () => sales.reduce((sum, sale) => sum + sale.credit, 0);
 
   return (
     <div className="space-y-6">
@@ -111,19 +117,11 @@ export default function Reports() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div>
             <Label>Дата начала</Label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </div>
           <div>
             <Label>Дата окончания</Label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <div className="flex items-end">
             <Button onClick={handleFilter} className="w-full">
@@ -157,7 +155,6 @@ export default function Reports() {
               <TableHead>Дата</TableHead>
               <TableHead>Сотрудник</TableHead>
               <TableHead>Филиал</TableHead>
-              <TableHead>Клиент</TableHead>
               <TableHead className="text-right">Сумма</TableHead>
               <TableHead className="text-right">Наличные</TableHead>
               <TableHead className="text-right">Карта</TableHead>
@@ -168,30 +165,15 @@ export default function Reports() {
           <TableBody>
             {sales.map((sale) => (
               <TableRow key={sale.id}>
+                <TableCell>{new Date(sale.created_at).toLocaleString('ru-RU')}</TableCell>
+                <TableCell>{sale.seller}</TableCell>
+                <TableCell>{sale.branch}</TableCell>
+                <TableCell className="text-right font-medium">{sale.total.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.cash.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.kaspi.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.credit.toFixed(2)} ₸</TableCell>
                 <TableCell>
-                  {new Date(sale.created_at).toLocaleString('ru-RU')}
-                </TableCell>
-                <TableCell>{sale.employees?.name || "-"}</TableCell>
-                <TableCell>{sale.branches?.name || "-"}</TableCell>
-                <TableCell>{sale.clients?.name || "-"}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {parseFloat(sale.total_amount).toFixed(2)} ₸
-                </TableCell>
-                <TableCell className="text-right">
-                  {parseFloat(sale.cash_amount || 0).toFixed(2)} ₸
-                </TableCell>
-                <TableCell className="text-right">
-                  {parseFloat(sale.card_amount || 0).toFixed(2)} ₸
-                </TableCell>
-                <TableCell className="text-right">
-                  {parseFloat(sale.credit_amount || 0).toFixed(2)} ₸
-                </TableCell>
-                <TableCell>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => viewDetails(sale)}
-                  >
+                  <Button size="icon" variant="ghost" onClick={() => viewDetails(sale)}>
                     <Eye className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -202,32 +184,18 @@ export default function Reports() {
       </Card>
 
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Детали продажи</DialogTitle>
           </DialogHeader>
-
           {selectedSale && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Дата:</span>{" "}
-                  {new Date(selectedSale.created_at).toLocaleString('ru-RU')}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Сотрудник:</span>{" "}
-                  {selectedSale.employees?.name || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Филиал:</span>{" "}
-                  {selectedSale.branches?.name || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Клиент:</span>{" "}
-                  {selectedSale.clients?.name || "-"}
-                </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Дата: {new Date(selectedSale.created_at).toLocaleString('ru-RU')}</div>
+                <div>Филиал: {selectedSale.branch_name || "-"}</div>
+                <div>Сотрудник: {selectedSale.seller_name || "-"}</div>
+                <div>Клиент: {selectedSale.client_name || "-"}</div>
               </div>
-
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -238,41 +206,18 @@ export default function Reports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {saleItems.map((item) => (
+                  {selectedSale.items.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.products?.name}</TableCell>
+                      <TableCell>{item.product_name || `ID ${item.product_id}`}</TableCell>
                       <TableCell className="text-right">
-                        {item.quantity} {item.products?.unit}
+                        {item.quantity} {item.product_unit || "шт"}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {parseFloat(item.price).toFixed(2)} ₸
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {parseFloat(item.total).toFixed(2)} ₸
-                      </TableCell>
+                      <TableCell className="text-right">{item.price.toFixed(2)} ₸</TableCell>
+                      <TableCell className="text-right">{(item.price * item.quantity).toFixed(2)} ₸</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between">
-                  <span>Наличные:</span>
-                  <span>{parseFloat(selectedSale.cash_amount || 0).toFixed(2)} ₸</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Карта:</span>
-                  <span>{parseFloat(selectedSale.card_amount || 0).toFixed(2)} ₸</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>В долг:</span>
-                  <span>{parseFloat(selectedSale.credit_amount || 0).toFixed(2)} ₸</span>
-                </div>
-                <div className="flex justify-between text-xl font-bold border-t pt-2">
-                  <span>Итого:</span>
-                  <span>{parseFloat(selectedSale.total_amount).toFixed(2)} ₸</span>
-                </div>
-              </div>
             </div>
           )}
         </DialogContent>

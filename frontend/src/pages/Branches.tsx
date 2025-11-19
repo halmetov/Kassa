@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -16,10 +16,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 export default function Branches() {
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<{ id: number; name: string; address?: string | null; active: boolean }[]>([]);
   const [newBranch, setNewBranch] = useState("");
   const [newAddress, setNewAddress] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editActive, setEditActive] = useState(true);
@@ -29,79 +29,67 @@ export default function Branches() {
   }, []);
 
   const fetchBranches = async () => {
-    const { data, error } = await supabase
-      .from('branches')
-      .select('*')
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await apiGet<{ id: number; name: string; address?: string | null; active: boolean }[]>("/api/branches");
+      setBranches(data);
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка загрузки филиалов");
-      return;
     }
-    setBranches(data || []);
   };
 
   const handleAdd = async () => {
     if (!newBranch.trim()) return;
 
-    const { error } = await supabase
-      .from('branches')
-      .insert({ 
+    try {
+      await apiPost("/api/branches", {
         name: newBranch.trim(),
-        address: newAddress.trim() || null
+        address: newAddress.trim() || null,
+        active: true,
       });
-
-    if (error) {
+      toast.success("Филиал добавлен");
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка добавления филиала");
       return;
     }
-
-    toast.success("Филиал добавлен");
     setNewBranch("");
     setNewAddress("");
     fetchBranches();
   };
 
-  const handleEdit = (branch: any) => {
+  const handleEdit = (branch: { id: number; name: string; address?: string | null; active: boolean }) => {
     setEditingId(branch.id);
     setEditValue(branch.name);
     setEditAddress(branch.address || "");
-    setEditActive(branch.is_active);
+    setEditActive(branch.active);
   };
 
-  const handleSave = async (id: string) => {
-    const { error } = await supabase
-      .from('branches')
-      .update({ 
-        name: editValue, 
+  const handleSave = async (id: number) => {
+    try {
+      await apiPut(`/api/branches/${id}`, {
+        name: editValue,
         address: editAddress || null,
-        is_active: editActive 
-      })
-      .eq('id', id);
-
-    if (error) {
+        active: editActive,
+      });
+      toast.success("Филиал обновлен");
+      setEditingId(null);
+      fetchBranches();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка обновления");
-      return;
     }
-
-    toast.success("Филиал обновлен");
-    setEditingId(null);
-    fetchBranches();
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase
-      .from('branches')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+  const handleDelete = async (id: number) => {
+    try {
+      await apiDelete(`/api/branches/${id}`);
+      toast.success("Филиал удален");
+      fetchBranches();
+    } catch (error) {
+      console.error(error);
       toast.error("Ошибка удаления");
-      return;
     }
-
-    toast.success("Филиал удален");
-    fetchBranches();
   };
 
   return (
@@ -169,8 +157,8 @@ export default function Branches() {
                       onCheckedChange={setEditActive}
                     />
                   ) : (
-                    <span className={branch.is_active ? "text-success" : "text-muted-foreground"}>
-                      {branch.is_active ? "Активен" : "Неактивен"}
+                    <span className={branch.active ? "text-success" : "text-muted-foreground"}>
+                      {branch.active ? "Активен" : "Неактивен"}
                     </span>
                   )}
                 </TableCell>

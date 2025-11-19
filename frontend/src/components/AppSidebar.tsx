@@ -33,7 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { signOut } from "@/lib/auth";
+import { AuthUser, signOut } from "@/lib/auth";
 import { toast } from "sonner";
 
 const menuItems = [
@@ -53,14 +53,14 @@ const systemItems = [
   { title: "Клиенты", url: "/clients", icon: UserCircle, adminOnly: false },
 ];
 
-export function AppSidebar({ employee }: { employee: any }) {
+export function AppSidebar({ user }: { user: AuthUser | null }) {
   const { open } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
-  const isAdmin = employee?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
 
   const handleLogout = async () => {
     try {
