@@ -7,7 +7,6 @@ from app.auth.security import (
     create_refresh_token,
     get_current_user,
     get_user_by_login,
-    hash_password,
     verify_password,
 )
 from app.database.session import get_db
@@ -30,23 +29,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
-
-
-@router.post("/register", response_model=auth_schema.AuthUser)
-async def register_user(payload: auth_schema.RegisterRequest, db: Session = Depends(get_db)):
-    existing = get_user_by_login(db, payload.username)
-    if existing:
-        raise HTTPException(status_code=400, detail="Login already exists")
-    user = User(
-        name=payload.name or payload.username,
-        login=payload.username,
-        password_hash=hash_password(payload.password),
-        role="seller",
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
 
 
 @router.get("/me", response_model=auth_schema.AuthUser)

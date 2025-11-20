@@ -61,13 +61,13 @@ export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; low
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin';
-  const isSeller = user?.role === 'seller';
+  const isEmployee = user?.role === 'employee';
 
-  const allowedForSeller = ["/pos", "/warehouse", "/reports"];
+  const allowedForEmployee = ["/pos", "/warehouse", "/reports"];
   const visibleMenuItems = user
     ? user.role === "admin"
       ? menuItems
-      : menuItems.filter((item) => allowedForSeller.includes(item.url))
+      : menuItems.filter((item) => allowedForEmployee.includes(item.url))
     : menuItems;
 
   const handleLogout = async () => {
@@ -119,7 +119,7 @@ export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; low
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {!isSeller && (
+        {!isEmployee && (
           <Collapsible defaultOpen={isSystemActive} className="group/collapsible">
             <SidebarGroup>
               <SidebarGroupLabel asChild>

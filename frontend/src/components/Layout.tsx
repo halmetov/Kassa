@@ -14,7 +14,7 @@ export const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const sellerAllowedRoutes = ["/pos", "/warehouse", "/reports"];
+  const employeeAllowedRoutes = ["/pos", "/warehouse", "/reports"];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -30,7 +30,7 @@ export const Layout = () => {
   }, [navigate]);
 
   useEffect(() => {
-    if (user?.role === "seller" && !sellerAllowedRoutes.includes(location.pathname)) {
+    if (user?.role === "employee" && !employeeAllowedRoutes.includes(location.pathname)) {
       navigate("/pos", { replace: true });
     }
   }, [location.pathname, navigate, user?.role]);

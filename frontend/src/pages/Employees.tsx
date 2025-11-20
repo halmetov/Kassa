@@ -27,7 +27,7 @@ type Employee = {
   id: number;
   name: string;
   login: string;
-  role: "admin" | "seller";
+  role: "admin" | "employee";
   active: boolean;
   branch_id: number | null;
 };
@@ -45,13 +45,13 @@ export default function Employees() {
     name: "",
     login: "",
     password: "",
-    role: "seller",
+    role: "employee",
     active: true,
     branch_id: null as number | null,
   });
   const [editData, setEditData] = useState({
     name: "",
-    role: "seller",
+    role: "employee",
     active: true,
     password: "",
     branch_id: null as number | null,
@@ -97,7 +97,7 @@ export default function Employees() {
         branch_id: formData.branch_id,
       });
       toast.success("Сотрудник добавлен");
-      setFormData({ name: "", login: "", password: "", role: "seller", active: true, branch_id: null });
+      setFormData({ name: "", login: "", password: "", role: "employee", active: true, branch_id: null });
       fetchEmployees();
     } catch (error) {
       console.error(error);
@@ -188,7 +188,7 @@ export default function Employees() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Администратор</SelectItem>
-                <SelectItem value="seller">Продавец</SelectItem>
+                <SelectItem value="employee">Продавец</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -247,18 +247,18 @@ export default function Employees() {
                   <TableCell>{employee.login}</TableCell>
                   <TableCell>
                     {editingId === employee.id ? (
-                      <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Администратор</SelectItem>
-                          <SelectItem value="seller">Продавец</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      employee.role === "admin" ? "Администратор" : "Продавец"
-                    )}
+                    <Select value={editData.role} onValueChange={(value) => setEditData({ ...editData, role: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Администратор</SelectItem>
+                        <SelectItem value="employee">Продавец</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    employee.role === "admin" ? "Администратор" : "Продавец"
+                  )}
                   </TableCell>
                   <TableCell>
                     {editingId === employee.id ? (

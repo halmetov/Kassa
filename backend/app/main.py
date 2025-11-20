@@ -17,7 +17,7 @@ from app.api import (
 from app.core.config import get_settings
 from app.database.base import Base
 from app.database.session import SessionLocal, engine
-from app.auth.security import hash_password
+from app.auth.security import get_password_hash
 from app.models.entities import User
 
 import app.models  # noqa: F401 - ensure models are imported for metadata
@@ -38,7 +38,7 @@ def on_startup() -> None:
             new_admin = User(
                 name="Admin",
                 login="admin",
-                password_hash=hash_password("admin"),
+                password_hash=get_password_hash("admin"),
                 role="admin",
                 active=True,
             )

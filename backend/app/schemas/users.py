@@ -7,7 +7,7 @@ from pydantic import BaseModel
 class UserBase(BaseModel):
     name: str
     login: str
-    role: str = "seller"
+    role: str = "employee"
     active: bool = True
     branch_id: Optional[int] = None
 
