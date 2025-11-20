@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,21 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 from app.models.mixins import TimestampMixin
 
-
-class User(Base, TimestampMixin):
-    __tablename__ = "users"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
-    login: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(Enum("admin", "employee", name="user_roles"), default="employee")
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id"), nullable=True)
-    branch: Mapped[Optional[Branch]] = relationship(back_populates="users")
-
-    incomes: Mapped[List[Income]] = relationship(back_populates="created_by_user", cascade="all,delete")
-    sales: Mapped[List[Sale]] = relationship(back_populates="seller")
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Category(Base, TimestampMixin):
@@ -63,7 +50,7 @@ class Branch(Base, TimestampMixin):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     stock_items: Mapped[List[Stock]] = relationship(back_populates="branch")
-    users: Mapped[List[User]] = relationship(back_populates="branch")
+    users: Mapped[List["User"]] = relationship("User", back_populates="branch")
 
 
 class Stock(Base, TimestampMixin):
@@ -85,7 +72,7 @@ class Income(Base, TimestampMixin):
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
-    created_by_user: Mapped[User] = relationship(back_populates="incomes")
+    created_by_user: Mapped["User"] = relationship("User", back_populates="incomes")
     branch: Mapped[Branch] = relationship()
     items: Mapped[List[IncomeItem]] = relationship(back_populates="income", cascade="all, delete-orphan")
 
@@ -128,7 +115,7 @@ class Sale(Base, TimestampMixin):
     total: Mapped[float] = mapped_column(Float, default=0)
     payment_type: Mapped[str] = mapped_column(String(50), default="cash")
 
-    seller: Mapped[User] = relationship(back_populates="sales")
+    seller: Mapped["User"] = relationship("User", back_populates="sales")
     branch: Mapped[Branch] = relationship()
     client: Mapped[Optional[Client]] = relationship(back_populates="sales")
     items: Mapped[List[SaleItem]] = relationship(back_populates="sale", cascade="all, delete-orphan")
