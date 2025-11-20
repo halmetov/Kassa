@@ -41,7 +41,7 @@ async def register_user(payload: auth_schema.RegisterRequest, db: Session = Depe
         name=payload.name or payload.username,
         login=payload.username,
         password_hash=hash_password(payload.password),
-        role="employee",
+        role="seller",
     )
     db.add(user)
     db.commit()

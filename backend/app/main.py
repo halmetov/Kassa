@@ -16,7 +16,9 @@ from app.api import (
 )
 from app.core.config import get_settings
 from app.database.base import Base
-from app.database.session import engine
+from app.database.session import SessionLocal, engine
+from app.auth.security import hash_password
+from app.models.entities import User
 
 import app.models  # noqa: F401 - ensure models are imported for metadata
 
@@ -28,6 +30,22 @@ app = FastAPI(title="Kassa API", version="1.0.0")
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.login == "admin").first()
+        if admin is None:
+            new_admin = User(
+                name="Admin",
+                login="admin",
+                password_hash=hash_password("admin"),
+                role="admin",
+                active=True,
+            )
+            db.add(new_admin)
+            db.commit()
+    finally:
+        db.close()
 
 ALLOWED_ORIGINS = [
     "http://localhost:8080",

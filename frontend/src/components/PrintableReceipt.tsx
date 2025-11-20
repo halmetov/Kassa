@@ -2,7 +2,6 @@ import { useRef } from "react";
 import logo from "@/assets/logo.png";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { QRCodeCanvas } from "qrcode.react";
 
 type SaleItem = {
   id: number;
@@ -46,7 +45,6 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
         .items th { border-bottom: 1px solid #ccc; }
         .totals { margin-top: 8px; font-size: 13px; }
         .meta { font-size: 12px; color: #555; }
-        .qr { text-align: center; margin-top: 12px; }
       </style>`
     );
     printWindow.document.write("</head><body>");
@@ -116,10 +114,7 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
             </div>
           </div>
 
-          <div className="qr">
-            <QRCodeCanvas value={JSON.stringify({ saleId: sale.id, total: sale.total })} size={96} />
-            <div className="text-xs text-muted-foreground mt-1">Спасибо за покупку!</div>
-          </div>
+          <div className="text-center text-xs text-muted-foreground mt-4">Спасибо за покупку!</div>
         </div>
       </Card>
       <Button onClick={handlePrint} className="w-full">
