@@ -27,7 +27,7 @@ type Employee = {
   id: number;
   name: string;
   login: string;
-  role: "admin" | "seller";
+  role: "admin" | "employee";
   active: boolean;
 };
 
@@ -38,12 +38,12 @@ export default function Employees() {
     name: "",
     login: "",
     password: "",
-    role: "seller",
+    role: "employee",
     active: true,
   });
   const [editData, setEditData] = useState({
     name: "",
-    role: "seller",
+    role: "employee",
     active: true,
     password: "",
   });
@@ -76,7 +76,7 @@ export default function Employees() {
         active: formData.active,
       });
       toast.success("Сотрудник добавлен");
-      setFormData({ name: "", login: "", password: "", role: "seller", active: true });
+      setFormData({ name: "", login: "", password: "", role: "employee", active: true });
       fetchEmployees();
     } catch (error) {
       console.error(error);
@@ -160,7 +160,7 @@ export default function Employees() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Администратор</SelectItem>
-                <SelectItem value="seller">Продавец</SelectItem>
+                <SelectItem value="employee">Сотрудник</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -203,11 +203,11 @@ export default function Employees() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Администратор</SelectItem>
-                          <SelectItem value="seller">Продавец</SelectItem>
+                          <SelectItem value="employee">Сотрудник</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
-                      employee.role === 'admin' ? 'Администратор' : 'Продавец'
+                      employee.role === "admin" ? "Администратор" : "Сотрудник"
                     )}
                   </TableCell>
                   <TableCell>

@@ -27,8 +27,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.active:
         raise HTTPException(status_code=400, detail="User disabled")
-    access_token = create_access_token(user.login)
-    refresh_token = create_refresh_token(user.login)
+    access_token = create_access_token({"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 
@@ -41,7 +41,7 @@ async def register_user(payload: auth_schema.RegisterRequest, db: Session = Depe
         name=payload.name or payload.username,
         login=payload.username,
         password_hash=hash_password(payload.password),
-        role="seller",
+        role="employee",
     )
     db.add(user)
     db.commit()
@@ -60,10 +60,10 @@ async def refresh_token(payload: auth_schema.RefreshRequest, db: Session = Depen
         data = jwt.decode(payload.refresh_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid refresh token") from exc
-    login = data.get("sub")
-    user = get_user_by_login(db, login)
+    user_id = data.get("sub")
+    user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    access_token = create_access_token(user.login)
-    refresh_token = create_refresh_token(user.login)
+    access_token = create_access_token({"sub": str(user.id), "role": user.role})
+    refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Callable
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -22,17 +21,22 @@ def get_user_by_login(db: Session, login: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-def create_token(subject: str, expires_delta: timedelta) -> str:
-    payload = {"sub": subject, "exp": datetime.utcnow() + expires_delta}
-    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    return db.get(User, user_id)
 
 
-def create_access_token(subject: str) -> str:
-    return create_token(subject, timedelta(minutes=settings.access_token_expire_minutes))
+def create_token(payload: dict, expires_delta: timedelta) -> str:
+    to_encode = payload.copy()
+    to_encode.update({"exp": datetime.utcnow() + expires_delta})
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_refresh_token(subject: str) -> str:
-    return create_token(subject, timedelta(minutes=settings.refresh_token_expire_minutes))
+def create_access_token(data: dict) -> str:
+    return create_token(data, timedelta(minutes=settings.access_token_expire_minutes))
+
+
+def create_refresh_token(data: dict) -> str:
+    return create_token(data, timedelta(minutes=settings.refresh_token_expire_minutes))
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -53,22 +57,25 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        login: str = payload.get("sub")
-        if login is None:
+        user_id = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
     except JWTError as exc:
         raise credentials_exception from exc
 
-    user = get_user_by_login(db, login)
+    user = get_user_by_id(db, int(user_id))
     if user is None or not user.active:
         raise credentials_exception
     return user
 
 
-def require_role(*roles: str) -> Callable:
-    async def dependency(current_user: User = Depends(get_current_user)) -> User:
-        if roles and current_user.role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
-        return current_user
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return current_user
 
-    return dependency
+
+def require_employee(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in {"admin", "employee"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return current_user

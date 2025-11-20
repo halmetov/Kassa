@@ -20,6 +20,7 @@ import {
 import { Eye } from "lucide-react";
 import { apiGet } from "@/api/client";
 import { toast } from "sonner";
+import { PrintableReceipt } from "@/components/PrintableReceipt";
 
 type SaleSummary = {
   id: number;
@@ -46,12 +47,14 @@ type SaleDetail = {
   id: number;
   created_at: string;
   branch_name?: string | null;
+  branch_address?: string | null;
   seller_name?: string | null;
   client_name?: string | null;
   total: number;
   cash: number;
   kaspi: number;
   credit: number;
+  payment_type: string;
   items: SaleDetailItem[];
 };
 
@@ -193,8 +196,10 @@ export default function Reports() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>Дата: {new Date(selectedSale.created_at).toLocaleString('ru-RU')}</div>
                 <div>Филиал: {selectedSale.branch_name || "-"}</div>
+                <div>Адрес: {selectedSale.branch_address || "-"}</div>
                 <div>Сотрудник: {selectedSale.seller_name || "-"}</div>
                 <div>Клиент: {selectedSale.client_name || "-"}</div>
+                <div>Оплата: {selectedSale.payment_type}</div>
               </div>
               <Table>
                 <TableHeader>
@@ -218,6 +223,7 @@ export default function Reports() {
                   ))}
                 </TableBody>
               </Table>
+              <PrintableReceipt sale={selectedSale} />
             </div>
           )}
         </DialogContent>
