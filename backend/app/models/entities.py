@@ -12,6 +12,9 @@ from app.models.mixins import TimestampMixin
 if TYPE_CHECKING:
     from app.models.user import User
 
+# Re-export the User model to keep backwards compatibility for existing imports.
+from .user import User
+
 
 class Category(Base, TimestampMixin):
     __tablename__ = "categories"
