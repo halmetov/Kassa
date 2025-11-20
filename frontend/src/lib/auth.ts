@@ -48,21 +48,6 @@ export async function login(username: string, password: string) {
   return getCurrentUser();
 }
 
-export async function register(payload: { username: string; password: string; name?: string }) {
-  const response = await fetch(`${API_URL}/api/auth/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || "Ошибка регистрации");
-  }
-  return response.json();
-}
-
 export async function refreshAccessToken() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;

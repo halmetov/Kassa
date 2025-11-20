@@ -47,6 +47,12 @@ def hash_password(password: str) -> str:
     return password_context.hash(password)
 
 
+def get_password_hash(password: str) -> str:
+    """Alias for password hashing to keep naming consistent across the app."""
+
+    return hash_password(password)
+
+
 async def get_current_user(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
@@ -76,6 +82,6 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_employee(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {"admin", "seller"}:
+    if current_user.role not in {"admin", "employee"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user

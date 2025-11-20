@@ -17,7 +17,7 @@ class User(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     login: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(Enum("admin", "seller", name="user_roles"), default="seller")
+    role: Mapped[str] = mapped_column(Enum("admin", "employee", name="user_roles"), default="employee")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id"), nullable=True)
     branch: Mapped[Optional[Branch]] = relationship(back_populates="users")
