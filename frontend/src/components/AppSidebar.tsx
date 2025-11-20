@@ -53,7 +53,7 @@ const systemItems = [
   { title: "Клиенты", url: "/clients", icon: UserCircle, adminOnly: false },
 ];
 
-export function AppSidebar({ user }: { user: AuthUser | null }) {
+export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; lowStockCount?: number }) {
   const { open } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,6 +61,14 @@ export function AppSidebar({ user }: { user: AuthUser | null }) {
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin';
+  const isEmployee = user?.role === 'employee';
+
+  const allowedForEmployee = ["/pos", "/warehouse", "/reports"];
+  const visibleMenuItems = user
+    ? user.role === "admin"
+      ? menuItems
+      : menuItems.filter((item) => allowedForEmployee.includes(item.url))
+    : menuItems;
 
   const handleLogout = async () => {
     try {
@@ -84,7 +92,7 @@ export function AppSidebar({ user }: { user: AuthUser | null }) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -93,7 +101,16 @@ export function AppSidebar({ user }: { user: AuthUser | null }) {
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >
                       <item.icon className="h-4 w-4" />
-                      {open && <span>{item.title}</span>}
+                      {open && (
+                        <span className="flex items-center gap-2">
+                          {item.title}
+                          {item.title === "Склад" && lowStockCount && lowStockCount > 0 && (
+                            <span className="inline-flex items-center rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">
+                              {lowStockCount}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -102,43 +119,45 @@ export function AppSidebar({ user }: { user: AuthUser | null }) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Collapsible defaultOpen={isSystemActive} className="group/collapsible">
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="hover:bg-sidebar-accent">
-                <Settings className="h-4 w-4" />
-                {open && (
-                  <>
-                    <span>Система</span>
-                    <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90 h-4 w-4" />
-                  </>
-                )}
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {systemItems
-                    .filter((item) => !item.adminOnly || isAdmin)
-                    .map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to={item.url}
-                            className="hover:bg-sidebar-accent"
-                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          >
-                            <item.icon className="h-4 w-4" />
-                            {open && <span>{item.title}</span>}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+        {!isEmployee && (
+          <Collapsible defaultOpen={isSystemActive} className="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="hover:bg-sidebar-accent">
+                  <Settings className="h-4 w-4" />
+                  {open && (
+                    <>
+                      <span>Система</span>
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90 h-4 w-4" />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {systemItems
+                      .filter((item) => !item.adminOnly || isAdmin)
+                      .map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to={item.url}
+                              className="hover:bg-sidebar-accent"
+                              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            >
+                              <item.icon className="h-4 w-4" />
+                              {open && <span>{item.title}</span>}
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>

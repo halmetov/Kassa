@@ -102,6 +102,7 @@ async def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
         id=sale.id,
         branch_id=sale.branch_id,
         branch_name=sale.branch.name if sale.branch else None,
+        branch_address=sale.branch.address if sale.branch else None,
         seller_id=sale.seller_id,
         seller_name=sale.seller.name if sale.seller else None,
         client_id=sale.client_id,

@@ -54,6 +54,7 @@ class SaleDetail(BaseModel):
     created_at: datetime
     branch_id: int
     branch_name: Optional[str] = None
+    branch_address: Optional[str] = None
     seller_id: int
     seller_name: Optional[str] = None
     client_id: Optional[int] = None

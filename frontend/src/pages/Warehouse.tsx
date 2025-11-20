@@ -22,15 +22,18 @@ import { toast } from "sonner";
 
 type Branch = { id: number; name: string; active: boolean };
 type StockItem = { id: number; product: string; quantity: number; limit?: number | null };
+type LowStockItem = { id: number; name: string; branch: string; quantity: number; limit: number };
 
 export default function Warehouse() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState("");
   const [stock, setStock] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
 
   useEffect(() => {
     fetchBranches();
+    fetchLowStock();
   }, []);
 
   useEffect(() => {
@@ -66,6 +69,15 @@ export default function Warehouse() {
     }
   };
 
+  const fetchLowStock = async () => {
+    try {
+      const data = await apiGet<LowStockItem[]>("/api/products/low-stock");
+      setLowStock(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const isLowStock = (item: StockItem) => {
     const limit = item.limit ?? 0;
     return item.quantity <= limit;
@@ -79,6 +91,11 @@ export default function Warehouse() {
       </div>
 
       <Card className="p-6">
+        {lowStock.length > 0 && (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            Есть товары ниже лимита: {lowStock.length}. <button onClick={fetchLowStock} className="underline">Обновить</button>
+          </div>
+        )}
         <div className="mb-6">
           <Label>Филиал</Label>
           <Select value={selectedBranch} onValueChange={setSelectedBranch}>

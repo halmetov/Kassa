@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.security import require_role
+from app.auth.security import require_admin, require_employee
 from app.database.session import get_db
 from app.models.entities import Branch, Product, Stock
 from app.schemas import branches as branch_schema
@@ -10,13 +10,13 @@ from app.schemas import branches as branch_schema
 router = APIRouter()
 
 
-@router.get("/", response_model=list[branch_schema.Branch])
+@router.get("/", response_model=list[branch_schema.Branch], dependencies=[Depends(require_employee)])
 async def list_branches(db: Session = Depends(get_db)):
     result = db.execute(select(Branch))
     return result.scalars().all()
 
 
-@router.post("/", response_model=branch_schema.Branch, dependencies=[Depends(require_role("admin"))])
+@router.post("/", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
 async def create_branch(payload: branch_schema.BranchCreate, db: Session = Depends(get_db)):
     branch = Branch(**payload.dict())
     db.add(branch)
@@ -25,7 +25,7 @@ async def create_branch(payload: branch_schema.BranchCreate, db: Session = Depen
     return branch
 
 
-@router.put("/{branch_id}", response_model=branch_schema.Branch, dependencies=[Depends(require_role("admin"))])
+@router.put("/{branch_id}", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
 async def update_branch(branch_id: int, payload: branch_schema.BranchUpdate, db: Session = Depends(get_db)):
     branch = db.get(Branch, branch_id)
     if not branch:
@@ -37,7 +37,7 @@ async def update_branch(branch_id: int, payload: branch_schema.BranchUpdate, db:
     return branch
 
 
-@router.delete("/{branch_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_role("admin"))])
+@router.delete("/{branch_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
 async def delete_branch(branch_id: int, db: Session = Depends(get_db)):
     branch = db.get(Branch, branch_id)
     if not branch:
@@ -47,7 +47,7 @@ async def delete_branch(branch_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@router.get("/{branch_id}/stock")
+@router.get("/{branch_id}/stock", dependencies=[Depends(require_employee)])
 async def branch_stock(branch_id: int, db: Session = Depends(get_db)):
     result = db.execute(
         select(Stock, Product.name)

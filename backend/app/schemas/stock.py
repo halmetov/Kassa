@@ -13,3 +13,11 @@ class Stock(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LowStockItem(BaseModel):
+    id: int
+    name: str
+    branch: str
+    quantity: int
+    limit: int
