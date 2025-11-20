@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password, require_admin
 from app.database.session import get_db
-from app.models.entities import User
+from app.models.user import User
 from app.schemas import users as user_schema
 
 router = APIRouter(dependencies=[Depends(require_admin)])

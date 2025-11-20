@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.database.base import Base
 from app.database.session import SessionLocal, engine
 from app.auth.security import get_password_hash
-from app.models.entities import User
+from app.models.user import User
 
 import app.models  # noqa: F401 - ensure models are imported for metadata
 

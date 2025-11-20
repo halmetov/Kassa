@@ -12,7 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.core.config import get_settings
 from app.database.base import Base
-from app.models import entities  # noqa
+from app import models  # noqa: F401 - ensure models are imported for metadata
 
 config = context.config
 settings = get_settings()

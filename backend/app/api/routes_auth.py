@@ -10,7 +10,7 @@ from app.auth.security import (
     verify_password,
 )
 from app.database.session import get_db
-from app.models.entities import User
+from app.models.user import User
 from app.schemas import auth as auth_schema
 from jose import JWTError, jwt
 from app.core.config import get_settings
