@@ -11,8 +11,8 @@ from .entities import (
     Sale,
     SaleItem,
     Stock,
-    User,
 )
+from .user import User
 
 __all__ = [
     "Branch",
