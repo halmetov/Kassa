@@ -29,10 +29,16 @@ app = FastAPI(title="Kassa API", version="1.0.0")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
 
+ALLOWED_ORIGINS = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://192.168.8.98:8080",  # TODO: replace with the active frontend origin if different
+    "http://10.225.7.109:8080"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
