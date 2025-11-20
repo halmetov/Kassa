@@ -17,8 +17,10 @@ class User(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     login: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(Enum("admin", "employee", name="user_roles"), default="employee")
+    role: Mapped[str] = mapped_column(Enum("admin", "seller", name="user_roles"), default="seller")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id"), nullable=True)
+    branch: Mapped[Optional[Branch]] = relationship(back_populates="users")
 
     incomes: Mapped[List[Income]] = relationship(back_populates="created_by_user", cascade="all,delete")
     sales: Mapped[List[Sale]] = relationship(back_populates="seller")
@@ -61,6 +63,7 @@ class Branch(Base, TimestampMixin):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     stock_items: Mapped[List[Stock]] = relationship(back_populates="branch")
+    users: Mapped[List[User]] = relationship(back_populates="branch")
 
 
 class Stock(Base, TimestampMixin):

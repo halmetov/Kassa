@@ -76,6 +76,6 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_employee(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {"admin", "employee"}:
+    if current_user.role not in {"admin", "seller"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user

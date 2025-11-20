@@ -27,29 +27,39 @@ type Employee = {
   id: number;
   name: string;
   login: string;
-  role: "admin" | "employee";
+  role: "admin" | "seller";
   active: boolean;
+  branch_id: number | null;
+};
+
+type Branch = {
+  id: number;
+  name: string;
 };
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     login: "",
     password: "",
-    role: "employee",
+    role: "seller",
     active: true,
+    branch_id: null as number | null,
   });
   const [editData, setEditData] = useState({
     name: "",
-    role: "employee",
+    role: "seller",
     active: true,
     password: "",
+    branch_id: null as number | null,
   });
 
   useEffect(() => {
     fetchEmployees();
+    fetchBranches();
   }, []);
 
   const fetchEmployees = async () => {
@@ -59,6 +69,16 @@ export default function Employees() {
     } catch (error) {
       console.error(error);
       toast.error("Ошибка загрузки сотрудников");
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const data = await apiGet<Branch[]>("/api/branches");
+      setBranches(data);
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить список филиалов");
     }
   };
 
@@ -74,9 +94,10 @@ export default function Employees() {
         password: formData.password,
         role: formData.role,
         active: formData.active,
+        branch_id: formData.branch_id,
       });
       toast.success("Сотрудник добавлен");
-      setFormData({ name: "", login: "", password: "", role: "employee", active: true });
+      setFormData({ name: "", login: "", password: "", role: "seller", active: true, branch_id: null });
       fetchEmployees();
     } catch (error) {
       console.error(error);
@@ -86,7 +107,13 @@ export default function Employees() {
 
   const handleEdit = (employee: Employee) => {
     setEditingId(employee.id);
-    setEditData({ name: employee.name, role: employee.role, active: employee.active, password: "" });
+    setEditData({
+      name: employee.name,
+      role: employee.role,
+      active: employee.active,
+      password: "",
+      branch_id: employee.branch_id,
+    });
   };
 
   const handleSave = async (id: number) => {
@@ -96,6 +123,7 @@ export default function Employees() {
         role: editData.role,
         active: editData.active,
         password: editData.password || undefined,
+        branch_id: editData.branch_id,
       });
       toast.success("Сотрудник обновлен");
       setEditingId(null);
@@ -160,7 +188,28 @@ export default function Employees() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Администратор</SelectItem>
-                <SelectItem value="employee">Сотрудник</SelectItem>
+                <SelectItem value="seller">Продавец</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Филиал</Label>
+            <Select
+              value={formData.branch_id !== null ? String(formData.branch_id) : "none"}
+              onValueChange={(value) =>
+                setFormData({ ...formData, branch_id: value === "none" ? null : Number(value) })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите филиал" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Без филиала</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={String(branch.id)}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -180,6 +229,7 @@ export default function Employees() {
                 <TableHead>Имя</TableHead>
                 <TableHead>Логин</TableHead>
                 <TableHead>Роль</TableHead>
+                <TableHead>Филиал</TableHead>
                 <TableHead>Статус</TableHead>
                 <TableHead className="w-[120px]">Действия</TableHead>
               </TableRow>
@@ -203,11 +253,35 @@ export default function Employees() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Администратор</SelectItem>
-                          <SelectItem value="employee">Сотрудник</SelectItem>
+                          <SelectItem value="seller">Продавец</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
-                      employee.role === "admin" ? "Администратор" : "Сотрудник"
+                      employee.role === "admin" ? "Администратор" : "Продавец"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === employee.id ? (
+                      <Select
+                        value={editData.branch_id !== null ? String(editData.branch_id) : "none"}
+                        onValueChange={(value) =>
+                          setEditData({ ...editData, branch_id: value === "none" ? null : Number(value) })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Без филиала</SelectItem>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.id} value={String(branch.id)}>
+                              {branch.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      branches.find((branch) => branch.id === employee.branch_id)?.name || "-"
                     )}
                   </TableCell>
                   <TableCell>

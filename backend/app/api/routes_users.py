@@ -27,6 +27,7 @@ async def create_user(payload: user_schema.UserCreate, db: Session = Depends(get
         role=payload.role,
         active=payload.active,
         password_hash=hash_password(payload.password),
+        branch_id=payload.branch_id,
     )
     db.add(user)
     db.commit()
