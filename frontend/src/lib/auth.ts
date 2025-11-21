@@ -8,6 +8,8 @@ export type AuthUser = {
   name: string;
   role: string;
   active: boolean;
+  branch_id: number | null;
+  branch_name?: string | null;
 };
 
 export function getAccessToken() {

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiGet, apiPost } from "@/api/client";
+import { AuthUser, getCurrentUser } from "@/lib/auth";
 
 interface Category {
   id: number;
@@ -47,6 +48,14 @@ interface Client {
   phone?: string | null;
 }
 
+interface Seller {
+  id: number;
+  name: string;
+  role: string;
+  branch_id: number | null;
+  active: boolean;
+}
+
 type CartItem = {
   product_id: number;
   name: string;
@@ -65,36 +74,110 @@ export default function POS() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedSeller, setSelectedSeller] = useState("");
   const [cashAmount, setCashAmount] = useState("");
   const [cardAmount, setCardAmount] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
   const [selectedClient, setSelectedClient] = useState("");
 
+  const isEmployee = user?.role === "employee";
+
   useEffect(() => {
-    fetchData();
+    const loadUser = async () => {
+      try {
+        const current = await getCurrentUser();
+        if (current) {
+          setUser(current);
+          setSelectedSeller(String(current.id));
+          if (current.branch_id) {
+            setSelectedBranch(String(current.branch_id));
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("Не удалось получить данные пользователя");
+      }
+    };
+
+    loadUser();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!user) return;
+      const branchId = user.role === "employee" ? user.branch_id : selectedBranch ? Number(selectedBranch) : null;
+      if (!branchId) {
+        setProducts([]);
+        setFilteredProducts([]);
+        if (user.role === "employee") {
+          toast.error("Сотрудник не привязан к филиалу");
+        }
+        return;
+      }
+      try {
+        const productsData = await apiGet<Product[]>(`/api/products?branch_id=${branchId}`);
+        setProducts(productsData);
+      } catch (error) {
+        console.error(error);
+        toast.error("Не удалось загрузить товары");
+      }
+    };
+
+    loadProducts();
+  }, [selectedBranch, user]);
 
   useEffect(() => {
     filterProducts();
   }, [selectedCategory, searchQuery, products]);
 
   const fetchData = async () => {
+    if (!user) return;
     try {
-      const [categoriesData, productsData, branchesData, clientsData] = await Promise.all([
+      const [categoriesData, branchesData, clientsData] = await Promise.all([
         apiGet<Category[]>("/api/categories"),
-        apiGet<Product[]>("/api/products"),
         apiGet<Branch[]>("/api/branches"),
         apiGet<Client[]>("/api/clients"),
       ]);
       setCategories(categoriesData);
-      setProducts(productsData);
       const activeBranches = branchesData.filter((branch) => branch.active);
       setBranches(activeBranches);
-      if (!selectedBranch && activeBranches.length > 0) {
-        setSelectedBranch(String(activeBranches[0].id));
-      }
+      setSelectedBranch((prev) => {
+        if (prev) return prev;
+        const preferredBranch = user.branch_id ?? activeBranches[0]?.id;
+        return preferredBranch ? String(preferredBranch) : "";
+      });
       setClients(clientsData);
+
+      if (user.role === "admin") {
+        const usersData = await apiGet<Seller[]>("/api/users");
+        const activeSellers = usersData.filter((u) => u.active);
+        setSellers(activeSellers);
+        setSelectedSeller((prev) => {
+          if (prev) return prev;
+          const fallback =
+            activeSellers.find((seller) => seller.id === user.id)?.id || activeSellers[0]?.id;
+          return fallback ? String(fallback) : "";
+        });
+      } else {
+        const selfSeller: Seller = {
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          branch_id: user.branch_id,
+          active: user.active,
+        };
+        setSellers([selfSeller]);
+        setSelectedSeller(String(user.id));
+      }
     } catch (error) {
       console.error(error);
       toast.error("Не удалось загрузить данные");
@@ -168,7 +251,12 @@ export default function POS() {
   const getTotalAmount = () => cart.reduce((sum, item) => sum + item.total, 0);
 
   const handlePayment = async () => {
-    const branchId = Number(selectedBranch);
+    if (!user) {
+      toast.error("Не удалось определить пользователя");
+      return;
+    }
+    const branchId = isEmployee ? user.branch_id : selectedBranch ? Number(selectedBranch) : null;
+    const sellerId = isEmployee ? user.id : selectedSeller ? Number(selectedSeller) : user.id;
     if (!branchId) {
       toast.error("Выберите филиал");
       return;
@@ -201,6 +289,7 @@ export default function POS() {
       }
       await apiPost("/api/sales", {
         branch_id: branchId,
+        seller_id: sellerId,
         client_id: selectedClient ? Number(selectedClient) : null,
         cash,
         kaspi: card,
@@ -368,7 +457,7 @@ export default function POS() {
           <div className="space-y-4">
             <div>
               <Label>Филиал</Label>
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <Select value={selectedBranch} onValueChange={setSelectedBranch} disabled={isEmployee}>
                 <SelectTrigger>
                   <SelectValue placeholder="Выберите филиал" />
                 </SelectTrigger>
@@ -376,6 +465,26 @@ export default function POS() {
                   {branches.map((branch) => (
                     <SelectItem key={branch.id} value={String(branch.id)}>
                       {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Продавец</Label>
+              <Select
+                value={selectedSeller}
+                onValueChange={setSelectedSeller}
+                disabled={isEmployee || sellers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите продавца" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sellers.map((seller) => (
+                    <SelectItem key={seller.id} value={String(seller.id)}>
+                      {seller.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

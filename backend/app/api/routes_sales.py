@@ -37,9 +37,21 @@ async def create_sale(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == "employee":
+        branch_id = current_user.branch_id
+        seller_id = current_user.id
+        if branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+    else:
+        branch_id = payload.branch_id
+        seller_id = payload.seller_id or current_user.id
+
+    if branch_id is None:
+        raise HTTPException(status_code=400, detail="Не указан филиал для продажи")
+
     sale = Sale(
-        branch_id=payload.branch_id,
-        seller_id=current_user.id,
+        branch_id=branch_id,
+        seller_id=seller_id,
         client_id=payload.client_id,
         cash=payload.cash,
         kaspi=payload.kaspi,
@@ -55,12 +67,12 @@ async def create_sale(
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         stock = db.execute(
-            select(Stock).where(Stock.branch_id == payload.branch_id, Stock.product_id == item.product_id)
+            select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == item.product_id)
         )
         stock_row = stock.scalar_one_or_none()
         if not stock_row or stock_row.quantity < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
-        adjust_stock(db, payload.branch_id, item.product_id, -item.quantity)
+        adjust_stock(db, branch_id, item.product_id, -item.quantity)
         product.quantity = max(product.quantity - item.quantity, 0)
         sale_item = SaleItem(sale_id=sale.id, product_id=item.product_id, quantity=item.quantity, price=item.price)
         db.add(sale_item)

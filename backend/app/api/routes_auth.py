@@ -33,7 +33,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
 @router.get("/me", response_model=auth_schema.AuthUser)
 async def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user
+    return auth_schema.AuthUser(
+        id=current_user.id,
+        login=current_user.login,
+        name=current_user.name,
+        role=current_user.role,
+        active=current_user.active,
+        branch_id=current_user.branch_id,
+        branch_name=current_user.branch.name if current_user.branch else None,
+    )
 
 
 @router.post("/refresh", response_model=auth_schema.Token)
