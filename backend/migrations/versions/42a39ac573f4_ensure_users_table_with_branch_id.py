@@ -23,15 +23,15 @@ def upgrade():
     columns = [column["name"] for column in inspector.get_columns("users")]
 
     if "branch_id" not in columns:
-        op.add_column("users", sa.Column("branch_id", sa.Integer(), nullable=True))
-        op.create_foreign_key(
-            "users_branch_id_fkey",
-            "users",
-            "branches",
-            ["branch_id"],
-            ["id"],
-            ondelete="SET NULL",
-        )
+        with op.batch_alter_table("users") as batch_op:
+            batch_op.add_column(sa.Column("branch_id", sa.Integer(), nullable=True))
+            batch_op.create_foreign_key(
+                "users_branch_id_fkey",
+                "branches",
+                ["branch_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
 
 
 def downgrade():
@@ -40,5 +40,6 @@ def downgrade():
     columns = [column["name"] for column in inspector.get_columns("users")]
 
     if "branch_id" in columns:
-        op.drop_constraint("users_branch_id_fkey", "users", type_="foreignkey")
-        op.drop_column("users", "branch_id")
+        with op.batch_alter_table("users") as batch_op:
+            batch_op.drop_constraint("users_branch_id_fkey", type_="foreignkey")
+            batch_op.drop_column("branch_id")

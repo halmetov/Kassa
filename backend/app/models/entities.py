@@ -73,9 +73,9 @@ class Income(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
-    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
-    created_by_user: Mapped["User"] = relationship("User", back_populates="incomes")
+    created_by: Mapped["User"] = relationship("User", back_populates="incomes")
     branch: Mapped[Branch] = relationship()
     items: Mapped[List[IncomeItem]] = relationship(back_populates="income", cascade="all, delete-orphan")
 
@@ -156,7 +156,11 @@ class Return(Base, TimestampMixin):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer)
     amount: Mapped[float] = mapped_column(Float)
-    processed_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    processed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+    processed_by: Mapped["User"] = relationship("User", back_populates="returns")
+    sale: Mapped[Sale] = relationship()
+    product: Mapped[Product] = relationship()
 
 
 class Log(Base):
@@ -165,5 +169,7 @@ class Log(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     action: Mapped[str] = mapped_column(String(255))
     payload: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    created_by: Mapped[Optional["User"]] = relationship("User", back_populates="logs")

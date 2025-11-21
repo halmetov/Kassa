@@ -20,3 +20,27 @@ class User(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     branch = relationship("Branch", back_populates="users")
+
+    incomes = relationship(
+        "Income",
+        back_populates="created_by",
+        cascade="all, delete-orphan",
+    )
+
+    sales = relationship(
+        "Sale",
+        back_populates="seller",
+        cascade="all, delete-orphan",
+    )
+
+    returns = relationship(
+        "Return",
+        back_populates="processed_by",
+        cascade="all, delete-orphan",
+    )
+
+    logs = relationship(
+        "Log",
+        back_populates="created_by",
+        cascade="all, delete-orphan",
+    )
