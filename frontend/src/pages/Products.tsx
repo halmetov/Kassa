@@ -31,7 +31,7 @@ interface Product {
   purchase_price: number;
   sale_price: number;
   wholesale_price: number;
-  limit: number | null;
+  limit: number;
   quantity: number;
 }
 
@@ -240,8 +240,8 @@ export default function Products() {
             <Label>Лимит</Label>
             <Input
               type="number"
-              value={formData.limit_quantity}
-              onChange={(e) => setFormData({ ...formData, limit_quantity: e.target.value })}
+              value={formData.limit}
+              onChange={(e) => setFormData({ ...formData, limit: e.target.value })}
             />
           </div>
         </div>

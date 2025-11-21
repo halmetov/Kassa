@@ -37,7 +37,7 @@ class Product(Base, TimestampMixin):
     purchase_price: Mapped[float] = mapped_column(Float, default=0)
     sale_price: Mapped[float] = mapped_column(Float, default=0)
     wholesale_price: Mapped[float] = mapped_column(Float, default=0)
-    limit: Mapped[Optional[int]] = mapped_column(Integer, default=0)
+    limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     quantity: Mapped[int] = mapped_column(Integer, default=0)
 
     category: Mapped[Optional[Category]] = relationship(back_populates="products")
@@ -71,9 +71,16 @@ class Stock(Base, TimestampMixin):
 class Income(Base, TimestampMixin):
     __tablename__ = "income"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
-    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    branch_id: Mapped[int] = mapped_column(
+        ForeignKey("branches.id"),
+        nullable=False,
+    )
+
+    created_by_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
 
     created_by: Mapped["User"] = relationship("User", back_populates="incomes")
     branch: Mapped[Branch] = relationship()

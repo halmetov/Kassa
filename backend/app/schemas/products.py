@@ -12,7 +12,7 @@ class ProductBase(BaseModel):
     purchase_price: float = 0
     sale_price: float = 0
     wholesale_price: float = 0
-    limit: Optional[int] = None
+    limit: int = 0
 
 
 class ProductCreate(ProductBase):
