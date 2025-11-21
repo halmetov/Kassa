@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -65,6 +65,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarP
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
+  const previousOpenMobile = useRef(openMobile);
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin';
@@ -92,10 +93,11 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarP
   }, [isOpen, setOpenMobile]);
 
   useEffect(() => {
-    if (!openMobile && isOpen) {
+    if (previousOpenMobile.current && !openMobile) {
       onClose();
     }
-  }, [isOpen, onClose, openMobile]);
+    previousOpenMobile.current = openMobile;
+  }, [onClose, openMobile]);
 
   const handleNavigate = () => {
     onClose();
