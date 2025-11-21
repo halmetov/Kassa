@@ -9,12 +9,16 @@ import { AuthUser, getCurrentUser } from "@/lib/auth";
 
 export const Layout = () => {
   const [open, setOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [lowStockCount, setLowStockCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
 
   const employeeAllowedRoutes = ["/pos", "/warehouse", "/reports"];
+
+  const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+  const closeSidebar = () => setIsSidebarOpen(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -36,6 +40,10 @@ export const Layout = () => {
   }, [location.pathname, navigate, user?.role]);
 
   useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
     const loadLowStock = async () => {
       try {
         const items = await apiGet<{ id: number }[]>("/api/products/low-stock");
@@ -53,13 +61,19 @@ export const Layout = () => {
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar user={user} lowStockCount={lowStockCount} />
+        <AppSidebar
+          user={user}
+          lowStockCount={lowStockCount}
+          isOpen={isSidebarOpen}
+          onClose={closeSidebar}
+        />
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6 lg:hidden">
+          <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6 md:hidden">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setOpen(!open)}
+              className="md:hidden"
+              onClick={toggleSidebar}
             >
               <Menu className="h-5 w-5" />
             </Button>

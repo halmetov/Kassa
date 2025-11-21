@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -9,7 +10,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -53,8 +53,15 @@ const systemItems = [
   { title: "Клиенты", url: "/clients", icon: UserCircle, adminOnly: false },
 ];
 
-export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; lowStockCount?: number }) {
-  const { open } = useSidebar();
+type AppSidebarProps = {
+  user: AuthUser | null;
+  lowStockCount?: number;
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarProps) {
+  const { open, openMobile, setOpenMobile } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
@@ -80,6 +87,20 @@ export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; low
     }
   };
 
+  useEffect(() => {
+    setOpenMobile(isOpen);
+  }, [isOpen, setOpenMobile]);
+
+  useEffect(() => {
+    if (!openMobile && isOpen) {
+      onClose();
+    }
+  }, [isOpen, onClose, openMobile]);
+
+  const handleNavigate = () => {
+    onClose();
+  };
+
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
@@ -95,13 +116,14 @@ export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; low
               {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      className="hover:bg-sidebar-accent"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {open && (
+                  <NavLink
+                    to={item.url}
+                    className="hover:bg-sidebar-accent"
+                    onClick={handleNavigate}
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {open && (
                         <span className="flex items-center gap-2">
                           {item.title}
                           {item.title === "Склад" && lowStockCount && lowStockCount > 0 && (
@@ -144,6 +166,7 @@ export function AppSidebar({ user, lowStockCount }: { user: AuthUser | null; low
                             <NavLink
                               to={item.url}
                               className="hover:bg-sidebar-accent"
+                              onClick={handleNavigate}
                               activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                             >
                               <item.icon className="h-4 w-4" />
