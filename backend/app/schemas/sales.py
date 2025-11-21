@@ -1,5 +1,4 @@
 from datetime import datetime
-from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -26,6 +25,7 @@ class SaleItemDetail(SaleItem):
 class SaleBase(BaseModel):
     branch_id: int
     client_id: Optional[int] = None
+    seller_id: Optional[int] = None
     items: List[SaleItemBase]
     cash: float = 0
     kaspi: float = 0

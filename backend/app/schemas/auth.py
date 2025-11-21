@@ -30,6 +30,8 @@ class AuthUser(BaseModel):
     name: str
     role: str
     active: bool
+    branch_id: Optional[int] = None
+    branch_name: Optional[str] = None
 
     class Config:
         from_attributes = True

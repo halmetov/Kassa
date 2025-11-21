@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.security import require_admin, require_employee
+from app.auth.security import get_current_user, require_admin, require_employee
 from app.database.session import get_db
 from app.models.entities import Branch, Product, Stock
+from app.models.user import User
 from app.schemas import stock as stock_schema
 from app.schemas import products as product_schema
 from app.services.files import save_upload
@@ -13,8 +14,26 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
-async def list_products(db: Session = Depends(get_db)):
-    result = db.execute(select(Product))
+async def list_products(
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    target_branch_id = branch_id
+    if current_user.role == "employee":
+        target_branch_id = current_user.branch_id
+        if target_branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+
+    query = select(Product)
+    if target_branch_id is not None:
+        query = (
+            query.join(Stock, Stock.product_id == Product.id)
+            .where(Stock.branch_id == target_branch_id)
+            .distinct()
+        )
+
+    result = db.execute(query)
     return result.scalars().all()
 
 
