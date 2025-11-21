@@ -29,7 +29,7 @@ class IncomeCreate(IncomeBase):
 
 class Income(IncomeBase):
     id: int
-    created_by: int
+    created_by_id: int
     created_at: datetime
     updated_at: datetime
     items: List[IncomeItem]

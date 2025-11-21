@@ -31,7 +31,7 @@ async def create_income(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    income = Income(branch_id=payload.branch_id, created_by=current_user.id)
+    income = Income(branch_id=payload.branch_id, created_by_id=current_user.id)
     db.add(income)
     db.flush()
     for item in payload.items:

@@ -42,7 +42,7 @@ async def create_return(
         product_id=payload.product_id,
         quantity=payload.quantity,
         amount=payload.amount,
-        processed_by=current_user.id,
+        processed_by_id=current_user.id,
     )
     db.add(return_entry)
     if sale.credit > 0 and sale.client_id:

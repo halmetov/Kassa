@@ -12,7 +12,7 @@ class ReturnCreate(BaseModel):
 
 class Return(ReturnCreate):
     id: int
-    processed_by: int
+    processed_by_id: int
     created_at: datetime
     updated_at: datetime
 
