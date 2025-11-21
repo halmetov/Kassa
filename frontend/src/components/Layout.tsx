@@ -73,7 +73,10 @@ export const Layout = () => {
               variant="ghost"
               size="icon"
               className="md:hidden"
-              onClick={toggleSidebar}
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleSidebar();
+              }}
             >
               <Menu className="h-5 w-5" />
             </Button>
