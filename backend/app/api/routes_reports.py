@@ -35,16 +35,20 @@ async def get_summary(
                 created_at=sale.created_at,
                 seller=seller_name,
                 branch=branch_name,
-                total=sale.total,
+                total_amount=sale.total_amount,
                 payment_type=sale.payment_type,
-                cash=sale.cash,
-                kaspi=sale.kaspi,
-                credit=sale.credit,
+                paid_cash=sale.paid_cash,
+                paid_card=sale.paid_card,
+                paid_debt=sale.paid_debt,
             )
         )
     by_day_query = db.execute(
         _apply_date_filters(
-            select(func.date(Sale.created_at), func.sum(Sale.total), func.sum(Sale.credit)).group_by(func.date(Sale.created_at)),
+            select(
+                func.date(Sale.created_at),
+                func.sum(Sale.total_amount),
+                func.sum(Sale.paid_debt),
+            ).group_by(func.date(Sale.created_at)),
             start_date,
             end_date,
         )
@@ -55,7 +59,7 @@ async def get_summary(
     ]
     by_seller_query = db.execute(
         _apply_date_filters(
-            select(User.name, func.sum(Sale.total)).join(Sale, Sale.seller_id == User.id).group_by(User.name),
+            select(User.name, func.sum(Sale.total_amount)).join(Sale, Sale.seller_id == User.id).group_by(User.name),
             start_date,
             end_date,
         )
@@ -63,7 +67,7 @@ async def get_summary(
     by_seller = [report_schema.StaffReport(seller=row[0], total=row[1] or 0) for row in by_seller_query.all()]
     by_branch_query = db.execute(
         _apply_date_filters(
-            select(Branch.name, func.sum(Sale.total)).join(Sale, Sale.branch_id == Branch.id).group_by(Branch.name),
+            select(Branch.name, func.sum(Sale.total_amount)).join(Sale, Sale.branch_id == Branch.id).group_by(Branch.name),
             start_date,
             end_date,
         )
@@ -85,11 +89,11 @@ async def get_analytics(
     end_dt = datetime.combine(end_date, time.max)
     totals_query = db.execute(
         select(
-            func.sum(Sale.total),
-            func.sum(Sale.credit),
+            func.sum(Sale.total_amount),
+            func.sum(Sale.paid_debt),
             func.count(Sale.id),
-            func.sum(Sale.cash),
-            func.sum(Sale.kaspi),
+            func.sum(Sale.paid_cash),
+            func.sum(Sale.paid_card),
         ).where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
     )
     total_sales, total_credit, total_receipts, total_cash, total_kaspi = totals_query.one()
@@ -97,7 +101,12 @@ async def get_analytics(
         cash=float(total_cash or 0), kaspi=float(total_kaspi or 0), credit=float(total_credit or 0)
     )
     sales_by_day_query = db.execute(
-        select(func.date(Sale.created_at), func.sum(Sale.total), func.sum(Sale.credit), func.count(Sale.id))
+        select(
+            func.date(Sale.created_at),
+            func.sum(Sale.total_amount),
+            func.sum(Sale.paid_debt),
+            func.count(Sale.id),
+        )
         .where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
         .group_by(func.date(Sale.created_at))
         .order_by(func.date(Sale.created_at))

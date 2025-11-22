@@ -119,16 +119,21 @@ class Sale(Base, TimestampMixin):
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     client_id: Mapped[Optional[int]] = mapped_column(ForeignKey("clients.id"), nullable=True)
-    cash: Mapped[float] = mapped_column(Float, default=0)
-    kaspi: Mapped[float] = mapped_column(Float, default=0)
-    credit: Mapped[float] = mapped_column(Float, default=0)
-    total: Mapped[float] = mapped_column(Float, default=0)
+    total_amount: Mapped[float] = mapped_column(Float, default=0)
+    paid_cash: Mapped[float] = mapped_column(Float, default=0)
+    paid_card: Mapped[float] = mapped_column(Float, default=0)
+    paid_debt: Mapped[float] = mapped_column(Float, default=0)
     payment_type: Mapped[str] = mapped_column(String(50), default="cash")
 
     seller: Mapped["User"] = relationship("User", back_populates="sales")
     branch: Mapped[Branch] = relationship()
     client: Mapped[Optional[Client]] = relationship(back_populates="sales")
-    items: Mapped[List[SaleItem]] = relationship(back_populates="sale", cascade="all, delete-orphan")
+    items: Mapped[List[SaleItem]] = relationship(
+        back_populates="sale", cascade="all, delete-orphan"
+    )
+    returns: Mapped[List["Return"]] = relationship(
+        back_populates="sale", cascade="all, delete-orphan"
+    )
 
 
 class SaleItem(Base):
@@ -139,8 +144,11 @@ class SaleItem(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer)
     price: Mapped[float] = mapped_column(Float)
+    discount: Mapped[float] = mapped_column(Float, default=0)
+    total: Mapped[float] = mapped_column(Float, default=0)
 
     sale: Mapped[Sale] = relationship(back_populates="items")
+    product: Mapped[Product] = relationship()
 
 
 class Debt(Base, TimestampMixin):
@@ -159,15 +167,31 @@ class Return(Base, TimestampMixin):
     __tablename__ = "returns"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id"))
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    sale_id: Mapped[int] = mapped_column(ForeignKey("sales.id", ondelete="CASCADE"))
+    branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
+    type: Mapped[str] = mapped_column(Enum("by_receipt", "by_item", name="return_type"))
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
+    sale: Mapped[Sale] = relationship(back_populates="returns")
+    branch: Mapped[Branch] = relationship()
+    created_by: Mapped["User"] = relationship("User", back_populates="processed_returns")
+    items: Mapped[List["ReturnItem"]] = relationship(
+        "ReturnItem", back_populates="return_entry", cascade="all, delete-orphan"
+    )
+
+
+class ReturnItem(Base):
+    __tablename__ = "return_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    return_id: Mapped[int] = mapped_column(ForeignKey("returns.id", ondelete="CASCADE"))
+    sale_item_id: Mapped[int] = mapped_column(ForeignKey("sales_items.id"))
     quantity: Mapped[int] = mapped_column(Integer)
     amount: Mapped[float] = mapped_column(Float)
-    processed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
-    processed_by: Mapped["User"] = relationship("User", back_populates="returns")
-    sale: Mapped[Sale] = relationship()
-    product: Mapped[Product] = relationship()
+    return_entry: Mapped[Return] = relationship(back_populates="items")
+    sale_item: Mapped[SaleItem] = relationship()
 
 
 class Log(Base):

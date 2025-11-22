@@ -25,13 +25,16 @@ import { PrintableReceipt } from "@/components/PrintableReceipt";
 type SaleSummary = {
   id: number;
   created_at: string;
-  seller: string;
-  branch: string;
-  total: number;
+  seller_name?: string | null;
+  seller_id: number;
+  branch_name?: string | null;
+  branch_id: number;
+  client_name?: string | null;
+  total_amount: number;
   payment_type: string;
-  cash: number;
-  kaspi: number;
-  credit: number;
+  paid_cash: number;
+  paid_card: number;
+  paid_debt: number;
 };
 
 type SaleDetailItem = {
@@ -39,6 +42,8 @@ type SaleDetailItem = {
   product_id: number;
   quantity: number;
   price: number;
+  discount?: number;
+  total: number;
   product_name?: string | null;
   product_unit?: string | null;
 };
@@ -50,10 +55,10 @@ type SaleDetail = {
   branch_address?: string | null;
   seller_name?: string | null;
   client_name?: string | null;
-  total: number;
-  cash: number;
-  kaspi: number;
-  credit: number;
+  total_amount: number;
+  paid_cash: number;
+  paid_card: number;
+  paid_debt: number;
   payment_type: string;
   items: SaleDetailItem[];
 };
@@ -79,8 +84,8 @@ export default function Reports() {
       const params = new URLSearchParams();
       if (start) params.set("start_date", start.toISOString().split('T')[0]);
       if (end) params.set("end_date", end.toISOString().split('T')[0]);
-      const data = await apiGet<{ sales: SaleSummary[] }>(`/api/reports/summary${params.toString() ? `?${params.toString()}` : ""}`);
-      setSales(data.sales);
+      const data = await apiGet<SaleSummary[]>(`/api/sales${params.toString() ? `?${params.toString()}` : ""}`);
+      setSales(data);
     } catch (error) {
       console.error(error);
       toast.error("Не удалось загрузить отчеты");
@@ -104,10 +109,10 @@ export default function Reports() {
     }
   };
 
-  const getTotalSales = () => sales.reduce((sum, sale) => sum + sale.total, 0);
-  const getTotalCash = () => sales.reduce((sum, sale) => sum + sale.cash, 0);
-  const getTotalCard = () => sales.reduce((sum, sale) => sum + sale.kaspi, 0);
-  const getTotalCredit = () => sales.reduce((sum, sale) => sum + sale.credit, 0);
+  const getTotalSales = () => sales.reduce((sum, sale) => sum + sale.total_amount, 0);
+  const getTotalCash = () => sales.reduce((sum, sale) => sum + sale.paid_cash, 0);
+  const getTotalCard = () => sales.reduce((sum, sale) => sum + sale.paid_card, 0);
+  const getTotalCredit = () => sales.reduce((sum, sale) => sum + sale.paid_debt, 0);
 
   return (
     <div className="space-y-6">
@@ -169,12 +174,12 @@ export default function Reports() {
             {sales.map((sale) => (
               <TableRow key={sale.id}>
                 <TableCell>{new Date(sale.created_at).toLocaleString('ru-RU')}</TableCell>
-                <TableCell>{sale.seller}</TableCell>
-                <TableCell>{sale.branch}</TableCell>
-                <TableCell className="text-right font-medium">{sale.total.toFixed(2)} ₸</TableCell>
-                <TableCell className="text-right">{sale.cash.toFixed(2)} ₸</TableCell>
-                <TableCell className="text-right">{sale.kaspi.toFixed(2)} ₸</TableCell>
-                <TableCell className="text-right">{sale.credit.toFixed(2)} ₸</TableCell>
+                <TableCell>{sale.seller_name || "-"}</TableCell>
+                <TableCell>{sale.branch_name || "-"}</TableCell>
+                <TableCell className="text-right font-medium">{sale.total_amount.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.paid_cash.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.paid_card.toFixed(2)} ₸</TableCell>
+                <TableCell className="text-right">{sale.paid_debt.toFixed(2)} ₸</TableCell>
                 <TableCell>
                   <Button size="icon" variant="ghost" onClick={() => viewDetails(sale)}>
                     <Eye className="h-4 w-4" />
@@ -218,7 +223,7 @@ export default function Reports() {
                         {item.quantity} {item.product_unit || "шт"}
                       </TableCell>
                       <TableCell className="text-right">{item.price.toFixed(2)} ₸</TableCell>
-                      <TableCell className="text-right">{(item.price * item.quantity).toFixed(2)} ₸</TableCell>
+                      <TableCell className="text-right">{(item.total || item.price * item.quantity).toFixed(2)} ₸</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

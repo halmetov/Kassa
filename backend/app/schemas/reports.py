@@ -9,11 +9,11 @@ class SaleSummary(BaseModel):
     created_at: datetime
     seller: str
     branch: str
-    total: float
+    total_amount: float
     payment_type: str
-    cash: float
-    kaspi: float
-    credit: float
+    paid_cash: float
+    paid_card: float
+    paid_debt: float
 
 
 class DailyReport(BaseModel):

@@ -33,9 +33,9 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-    returns = relationship(
+    processed_returns = relationship(
         "Return",
-        back_populates="processed_by",
+        back_populates="created_by",
         cascade="all, delete-orphan",
     )
 
