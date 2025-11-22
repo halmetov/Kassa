@@ -9,6 +9,8 @@ type SaleItem = {
   product_id: number;
   quantity: number;
   price: number;
+  discount?: number;
+  total: number;
   product_unit?: string | null;
 };
 
@@ -19,10 +21,10 @@ type SaleDetail = {
   branch_address?: string | null;
   seller_name?: string | null;
   client_name?: string | null;
-  total: number;
-  cash: number;
-  kaspi: number;
-  credit: number;
+  total_amount: number;
+  paid_cash: number;
+  paid_card: number;
+  paid_debt: number;
   payment_type: string;
   items: SaleItem[];
 };
@@ -55,7 +57,7 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
     printWindow.print();
   };
 
-  const totalPaid = sale.cash + sale.kaspi;
+  const totalPaid = sale.paid_cash + sale.paid_card;
 
   return (
     <div className="space-y-2">
@@ -85,7 +87,7 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
                       {item.quantity} {item.product_unit || "шт"} x {item.price.toFixed(2)}
                     </div>
                   </td>
-                  <td style={{ textAlign: "right" }}>{(item.price * item.quantity).toFixed(2)}</td>
+                  <td style={{ textAlign: "right" }}>{(item.total || item.price * item.quantity).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -94,7 +96,7 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
           <div className="totals space-y-1">
             <div className="flex justify-between">
               <span>Итого</span>
-              <span>{sale.total.toFixed(2)} ₸</span>
+              <span>{sale.total_amount.toFixed(2)} ₸</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Оплачено</span>
@@ -102,7 +104,7 @@ export function PrintableReceipt({ sale }: { sale: SaleDetail }) {
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Долг</span>
-              <span>{sale.credit.toFixed(2)} ₸</span>
+              <span>{sale.paid_debt.toFixed(2)} ₸</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Кассир</span>

@@ -291,14 +291,15 @@ export default function POS() {
         branch_id: branchId,
         seller_id: sellerId,
         client_id: selectedClient ? Number(selectedClient) : null,
-        cash,
-        kaspi: card,
-        credit,
+        paid_cash: cash,
+        paid_card: card,
+        paid_debt: credit,
         payment_type: paymentType,
         items: cart.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
           price: item.price,
+          discount: 0,
         })),
       });
       toast.success("Продажа завершена успешно");

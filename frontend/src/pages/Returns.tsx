@@ -26,6 +26,8 @@ type SaleDetailItem = {
   product_id: number;
   quantity: number;
   price: number;
+  discount?: number;
+  total: number;
   product_name?: string | null;
   product_unit?: string | null;
 };
@@ -35,8 +37,8 @@ type SaleDetail = {
   created_at: string;
   branch_name?: string | null;
   seller_name?: string | null;
-  total: number;
-  credit: number;
+  total_amount: number;
+  paid_debt: number;
   client_name?: string | null;
   client_id?: number | null;
   items: SaleDetailItem[];
@@ -78,7 +80,9 @@ export default function Returns() {
     if (!sale) return 0;
     return sale.items.reduce((sum, item) => {
       const returnQty = returnItems.get(item.id) || 0;
-      return sum + returnQty * item.price;
+      const unitTotal = item.total || item.price * item.quantity;
+      const unitPrice = unitTotal / item.quantity;
+      return sum + returnQty * unitPrice;
     }, 0);
   };
 
@@ -94,9 +98,13 @@ export default function Returns() {
         if (!item) continue;
         await apiPost("/api/returns", {
           sale_id: sale.id,
-          product_id: item.product_id,
-          quantity: returnQty,
-          amount: returnQty * item.price,
+          type: "by_item",
+          items: [
+            {
+              sale_item_id: item.id,
+              quantity: returnQty,
+            },
+          ],
         });
       }
       toast.success("Возврат выполнен успешно");
@@ -145,7 +153,7 @@ export default function Returns() {
               </div>
               <div>
                 <span className="text-muted-foreground">Сумма:</span>
-                <span className="font-bold"> {sale.total.toFixed(2)} ₸</span>
+                <span className="font-bold"> {sale.total_amount.toFixed(2)} ₸</span>
               </div>
             </div>
 
@@ -162,7 +170,9 @@ export default function Returns() {
               <TableBody>
                 {sale.items.map((item) => {
                   const returnQty = returnItems.get(item.id) || 0;
-                  const returnAmount = returnQty * item.price;
+                  const unitTotal = item.total || item.price * item.quantity;
+                  const unitPrice = unitTotal / item.quantity;
+                  const returnAmount = returnQty * unitPrice;
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{item.product_name || `ID ${item.product_id}`}</TableCell>
