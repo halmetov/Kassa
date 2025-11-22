@@ -16,7 +16,7 @@ async def list_categories(db: Session = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.post("/", response_model=category_schema.Category, dependencies=[Depends(require_admin)])
+@router.post("/", response_model=category_schema.Category, dependencies=[Depends(require_employee)])
 async def create_category(payload: category_schema.CategoryCreate, db: Session = Depends(get_db)):
     category = Category(name=payload.name)
     db.add(category)
@@ -25,7 +25,7 @@ async def create_category(payload: category_schema.CategoryCreate, db: Session =
     return category
 
 
-@router.put("/{category_id}", response_model=category_schema.Category, dependencies=[Depends(require_admin)])
+@router.put("/{category_id}", response_model=category_schema.Category, dependencies=[Depends(require_employee)])
 async def update_category(category_id: int, payload: category_schema.CategoryUpdate, db: Session = Depends(get_db)):
     category = db.get(Category, category_id)
     if not category:

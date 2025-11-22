@@ -37,7 +37,7 @@ async def list_products(
     return result.scalars().all()
 
 
-@router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_admin)])
+@router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
     product = Product(**payload.dict())
     db.add(product)
@@ -46,7 +46,7 @@ async def create_product(payload: product_schema.ProductCreate, db: Session = De
     return product
 
 
-@router.put("/{product_id}", response_model=product_schema.Product, dependencies=[Depends(require_admin)])
+@router.put("/{product_id}", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def update_product(product_id: int, payload: product_schema.ProductUpdate, db: Session = Depends(get_db)):
     product = db.get(Product, product_id)
     if not product:
@@ -81,13 +81,27 @@ async def upload_photo(product_id: int, file: UploadFile = File(...), db: Sessio
 
 
 @router.get("/low-stock", response_model=list[stock_schema.LowStockItem], dependencies=[Depends(require_employee)])
-async def low_stock(db: Session = Depends(get_db)):
-    result = db.execute(
+async def low_stock(
+    branch_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    target_branch_id = branch_id
+    if current_user.role == "employee":
+        target_branch_id = current_user.branch_id
+        if target_branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+
+    query = (
         select(Stock, Product, Branch)
         .join(Product, Stock.product_id == Product.id)
         .join(Branch, Stock.branch_id == Branch.id)
         .where(Stock.quantity < Product.limit)
     )
+    if target_branch_id is not None:
+        query = query.where(Stock.branch_id == target_branch_id)
+
+    result = db.execute(query)
     items: list[stock_schema.LowStockItem] = []
     for stock, product, branch in result.all():
         items.append(
