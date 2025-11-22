@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.auth.security import get_current_user, require_admin, require_employee
 from app.database.session import get_db
 from app.models.entities import Branch, Product, Stock
+from app.models.user import User
 from app.schemas import branches as branch_schema
 
 router = APIRouter()
