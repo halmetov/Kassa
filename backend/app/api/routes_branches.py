@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.security import require_admin, require_employee
+from app.auth.security import get_current_user, require_admin, require_employee
 from app.database.session import get_db
 from app.models.entities import Branch, Product, Stock
 from app.schemas import branches as branch_schema
@@ -10,9 +10,20 @@ from app.schemas import branches as branch_schema
 router = APIRouter()
 
 
-@router.get("/", response_model=list[branch_schema.Branch], dependencies=[Depends(require_employee)])
-async def list_branches(db: Session = Depends(get_db)):
-    result = db.execute(select(Branch))
+@router.get(
+    "/",
+    response_model=list[branch_schema.Branch],
+    dependencies=[Depends(require_employee)],
+)
+async def list_branches(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    query = select(Branch)
+    if current_user.role == "employee":
+        if current_user.branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        query = query.where(Branch.id == current_user.branch_id)
+    result = db.execute(query)
     return result.scalars().all()
 
 
@@ -48,11 +59,23 @@ async def delete_branch(branch_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{branch_id}/stock", dependencies=[Depends(require_employee)])
-async def branch_stock(branch_id: int, db: Session = Depends(get_db)):
+async def branch_stock(
+    branch_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    target_branch = branch_id
+    if current_user.role == "employee":
+        if current_user.branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        if current_user.branch_id != branch_id:
+            raise HTTPException(status_code=403, detail="Нет доступа к складу филиала")
+        target_branch = current_user.branch_id
+
     result = db.execute(
         select(Stock, Product.name)
         .join(Product, Stock.product_id == Product.id)
-        .where(Stock.branch_id == branch_id)
+        .where(Stock.branch_id == target_branch)
     )
     response = []
     for stock, product_name in result.all():

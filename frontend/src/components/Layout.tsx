@@ -15,7 +15,16 @@ export const Layout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const employeeAllowedRoutes = ["/pos", "/warehouse", "/reports"];
+  const employeeAllowedRoutes = [
+    "/",
+    "/pos",
+    "/warehouse",
+    "/income",
+    "/returns",
+    "/categories",
+    "/products",
+    "/clients",
+  ];
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
   const closeSidebar = () => setIsSidebarOpen(false);

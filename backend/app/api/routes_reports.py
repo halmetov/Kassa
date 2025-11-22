@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.auth.security import require_admin
 from app.database.session import get_db
 from app.models.entities import Branch, Product, Sale, SaleItem, User
 from app.schemas import reports as report_schema
@@ -19,13 +20,22 @@ def _apply_date_filters(query, start_date: date | None, end_date: date | None):
     return query
 
 
-@router.get("/summary", response_model=report_schema.ReportsResponse)
+@router.get(
+    "/summary",
+    response_model=report_schema.ReportsResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def get_summary(
     start_date: date | None = None,
     end_date: date | None = None,
+    branch_id: int | None = None,
     db: Session = Depends(get_db),
 ):
+    branch_clause = Sale.branch_id == branch_id if branch_id else None
+
     base_query = select(Sale, User.name, Branch.name).join(User).join(Branch)
+    if branch_clause is not None:
+        base_query = base_query.where(branch_clause)
     sales_result = db.execute(_apply_date_filters(base_query, start_date, end_date))
     sales = []
     for sale, seller_name, branch_name in sales_result.all():
@@ -44,10 +54,19 @@ async def get_summary(
         )
     by_day_query = db.execute(
         _apply_date_filters(
-            select(
-                func.date(Sale.created_at),
-                func.sum(Sale.total_amount),
-                func.sum(Sale.paid_debt),
+            (
+                select(
+                    func.date(Sale.created_at),
+                    func.sum(Sale.total_amount),
+                    func.sum(Sale.paid_debt),
+                )
+                .where(branch_clause)
+                if branch_clause is not None
+                else select(
+                    func.date(Sale.created_at),
+                    func.sum(Sale.total_amount),
+                    func.sum(Sale.paid_debt),
+                )
             ).group_by(func.date(Sale.created_at)),
             start_date,
             end_date,
@@ -59,7 +78,13 @@ async def get_summary(
     ]
     by_seller_query = db.execute(
         _apply_date_filters(
-            select(User.name, func.sum(Sale.total_amount)).join(Sale, Sale.seller_id == User.id).group_by(User.name),
+            (
+                select(User.name, func.sum(Sale.total_amount))
+                .join(Sale, Sale.seller_id == User.id)
+                .where(branch_clause)
+                if branch_clause is not None
+                else select(User.name, func.sum(Sale.total_amount)).join(Sale, Sale.seller_id == User.id)
+            ).group_by(User.name),
             start_date,
             end_date,
         )
@@ -67,7 +92,13 @@ async def get_summary(
     by_seller = [report_schema.StaffReport(seller=row[0], total=row[1] or 0) for row in by_seller_query.all()]
     by_branch_query = db.execute(
         _apply_date_filters(
-            select(Branch.name, func.sum(Sale.total_amount)).join(Sale, Sale.branch_id == Branch.id).group_by(Branch.name),
+            (
+                select(Branch.name, func.sum(Sale.total_amount))
+                .join(Sale, Sale.branch_id == Branch.id)
+                .where(branch_clause)
+                if branch_clause is not None
+                else select(Branch.name, func.sum(Sale.total_amount)).join(Sale, Sale.branch_id == Branch.id)
+            ).group_by(Branch.name),
             start_date,
             end_date,
         )
@@ -76,10 +107,15 @@ async def get_summary(
     return report_schema.ReportsResponse(sales=sales, by_day=by_day, by_seller=by_seller, by_branch=by_branch)
 
 
-@router.get("/analytics", response_model=report_schema.AnalyticsResponse)
+@router.get(
+    "/analytics",
+    response_model=report_schema.AnalyticsResponse,
+    dependencies=[Depends(require_admin)],
+)
 async def get_analytics(
     start_date: date | None = None,
     end_date: date | None = None,
+    branch_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     if not start_date or not end_date:
@@ -87,6 +123,7 @@ async def get_analytics(
         start_date = start_date or (end_date - timedelta(days=30))
     start_dt = datetime.combine(start_date, time.min)
     end_dt = datetime.combine(end_date, time.max)
+    branch_clause = Sale.branch_id == branch_id if branch_id else None
     totals_query = db.execute(
         select(
             func.sum(Sale.total_amount),
@@ -94,7 +131,11 @@ async def get_analytics(
             func.count(Sale.id),
             func.sum(Sale.paid_cash),
             func.sum(Sale.paid_card),
-        ).where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
+        ).where(
+            Sale.created_at >= start_dt,
+            Sale.created_at <= end_dt,
+            *( [branch_clause] if branch_clause is not None else [] ),
+        )
     )
     total_sales, total_credit, total_receipts, total_cash, total_kaspi = totals_query.one()
     payment_breakdown = report_schema.PaymentBreakdown(
@@ -107,7 +148,11 @@ async def get_analytics(
             func.sum(Sale.paid_debt),
             func.count(Sale.id),
         )
-        .where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
+        .where(
+            Sale.created_at >= start_dt,
+            Sale.created_at <= end_dt,
+            *( [branch_clause] if branch_clause is not None else [] ),
+        )
         .group_by(func.date(Sale.created_at))
         .order_by(func.date(Sale.created_at))
     )
@@ -124,7 +169,11 @@ async def get_analytics(
         )
         .join(Sale, SaleItem.sale_id == Sale.id)
         .join(Product, SaleItem.product_id == Product.id)
-        .where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
+        .where(
+            Sale.created_at >= start_dt,
+            Sale.created_at <= end_dt,
+            *( [branch_clause] if branch_clause is not None else [] ),
+        )
         .group_by(Product.id, Product.name)
         .order_by(func.sum(SaleItem.quantity * SaleItem.price).desc())
         .limit(10)
