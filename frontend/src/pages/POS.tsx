@@ -34,6 +34,8 @@ interface Product {
   sale_price: number;
   barcode?: string | null;
   unit: string;
+  image_url?: string | null;
+  photo?: string | null;
 }
 
 interface Branch {
@@ -355,6 +357,15 @@ export default function POS() {
               className="p-4 cursor-pointer hover:border-primary transition"
               onClick={() => addToCart(product)}
             >
+              {(product.image_url || product.photo) && (
+                <div className="mb-3 flex justify-center">
+                  <img
+                    src={product.image_url || product.photo || ""}
+                    alt={product.name}
+                    className="h-24 w-24 object-cover rounded"
+                  />
+                </div>
+              )}
               <div className="font-semibold">{product.name}</div>
               <div className="text-sm text-muted-foreground">
                 {product.sale_price.toFixed(2)} ₸ / {product.unit}

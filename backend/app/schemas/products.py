@@ -13,6 +13,7 @@ class ProductBase(BaseModel):
     sale_price: float = 0
     wholesale_price: float = 0
     limit: int = 0
+    image_url: Optional[str] = None
 
 
 class ProductCreate(ProductBase):
@@ -26,6 +27,7 @@ class ProductUpdate(ProductBase):
 class Product(ProductBase):
     id: int
     photo: Optional[str]
+    image_url: Optional[str]
     quantity: int
     created_at: datetime
     updated_at: datetime

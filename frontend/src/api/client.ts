@@ -63,6 +63,14 @@ export async function apiPut<T>(path: string, body: unknown, options: RequestIni
   });
 }
 
+export async function apiUpload<T>(path: string, formData: FormData, options: RequestInit = {}): Promise<T> {
+  return request<T>(path, {
+    method: "POST",
+    body: formData,
+    ...options,
+  });
+}
+
 export async function apiDelete<T>(path: string, options: RequestInit = {}): Promise<T> {
   return request<T>(path, {
     method: "DELETE",

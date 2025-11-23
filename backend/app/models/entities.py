@@ -32,6 +32,7 @@ class Product(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     unit: Mapped[str] = mapped_column(String(50), default="pcs")
     barcode: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
     purchase_price: Mapped[float] = mapped_column(Float, default=0)
