@@ -13,7 +13,12 @@ class User(Base):
     login = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(
-        Enum(UserRole, name="user_roles", create_type=False),
+        Enum(
+            UserRole,
+            name="user_roles",
+            create_type=False,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+        ),
         nullable=False,
     )
     active = Column(Boolean, default=True)
