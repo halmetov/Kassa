@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user, require_employee
 from app.database.session import get_db
-from app.models.entities import Income, IncomeItem, Product, User
+from app.models.entities import Income, IncomeItem, Product
+from app.models.user import User
 from app.schemas import income as income_schema
 from app.services.inventory import adjust_stock
 

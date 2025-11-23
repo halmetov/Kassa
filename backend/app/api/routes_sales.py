@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -6,7 +8,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import get_current_user
 from app.database.session import get_db
-from app.models.entities import Client, Debt, Product, Sale, SaleItem, Stock, User
+from app.models.entities import Client, Debt, Product, Sale, SaleItem, Stock
+from app.models.user import User
 from app.schemas import sales as sales_schema
 from app.services.inventory import adjust_stock
 
