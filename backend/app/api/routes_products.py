@@ -77,6 +77,7 @@ async def upload_photo(product_id: int, file: UploadFile = File(...), db: Sessio
         raise HTTPException(status_code=404, detail="Product not found")
     photo_path = await save_upload(file)
     product.photo = photo_path
+    product.image_url = photo_path
     db.commit()
     db.refresh(product)
     return product

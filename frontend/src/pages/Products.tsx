@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -33,13 +33,17 @@ interface Product {
   wholesale_price: number;
   limit: number;
   quantity: number;
+  image_url?: string | null;
+  photo?: string | null;
 }
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
-  
+  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
+  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     category_id: "",
@@ -84,7 +88,7 @@ export default function Products() {
     }
 
     try {
-      await apiPost("/api/products", {
+      const product = await apiPost<Product>("/api/products", {
         name: formData.name.trim(),
         category_id: formData.category_id ? Number(formData.category_id) : null,
         unit: formData.unit,
@@ -94,6 +98,17 @@ export default function Products() {
         wholesale_price: parseFloat(formData.wholesale_price) || 0,
         limit: parseInt(formData.limit) || 0,
       });
+
+      if (newPhotoFile) {
+        try {
+          const photoData = new FormData();
+          photoData.append("file", newPhotoFile);
+          await apiUpload(`/api/products/${product.id}/photo`, photoData);
+        } catch (error) {
+          console.error(error);
+          toast.error("Не удалось загрузить фото");
+        }
+      }
 
       toast.success("Товар добавлен");
     } catch (error) {
@@ -111,6 +126,7 @@ export default function Products() {
       wholesale_price: "0",
       limit: "0",
     });
+    setNewPhotoFile(null);
     fetchProducts();
   };
 
@@ -126,6 +142,7 @@ export default function Products() {
       wholesale_price: product.wholesale_price.toString(),
       limit: (product.limit ?? 0).toString(),
     });
+    setEditPhotoFile(null);
   };
 
   const handleSave = async (id: number) => {
@@ -140,8 +157,20 @@ export default function Products() {
         wholesale_price: parseFloat(editData.wholesale_price) || 0,
         limit: parseInt(editData.limit) || 0,
       });
+
+      if (editPhotoFile) {
+        try {
+          const photoData = new FormData();
+          photoData.append("file", editPhotoFile);
+          await apiUpload(`/api/products/${id}/photo`, photoData);
+        } catch (error) {
+          console.error(error);
+          toast.error("Не удалось загрузить фото");
+        }
+      }
       toast.success("Товар обновлен");
       setEditingId(null);
+      setEditPhotoFile(null);
       fetchProducts();
     } catch (error) {
       console.error(error);
@@ -213,6 +242,15 @@ export default function Products() {
             />
           </div>
           <div>
+            <Label>Фото (камера или устройство)</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setNewPhotoFile(e.target.files?.[0] || null)}
+            />
+          </div>
+          <div>
             <Label>Цена прихода</Label>
             <Input
               type="number"
@@ -253,6 +291,7 @@ export default function Products() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Фото</TableHead>
                 <TableHead>Название</TableHead>
                 <TableHead>Категория</TableHead>
                 <TableHead>Ед.изм</TableHead>
@@ -270,6 +309,33 @@ export default function Products() {
               const categoryName = categories.find((cat) => cat.id === product.category_id)?.name || "Без категории";
               return (
               <TableRow key={product.id}>
+                  <TableCell>
+                    {editingId === product.id ? (
+                      <div className="space-y-2">
+                        {(product.image_url || product.photo) && (
+                          <img
+                            src={product.image_url || product.photo || ""}
+                            alt={product.name}
+                            className="h-12 w-12 object-cover rounded"
+                          />
+                        )}
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) => setEditPhotoFile(e.target.files?.[0] || null)}
+                        />
+                      </div>
+                    ) : product.image_url || product.photo ? (
+                      <img
+                        src={product.image_url || product.photo || ""}
+                        alt={product.name}
+                        className="h-12 w-12 object-cover rounded"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Нет фото</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {editingId === product.id ? (
                       <Input
@@ -387,7 +453,10 @@ export default function Products() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => setEditingId(null)}
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditPhotoFile(null);
+                            }}
                           >
                             <X className="h-4 w-4" />
                           </Button>
