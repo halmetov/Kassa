@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -93,7 +94,7 @@ async def create_sale(
     if branch_id is None:
         raise HTTPException(status_code=400, detail="Не указан филиал для продажи")
 
-    total = 0.0
+    total = Decimal("0")
     sale = Sale(
         branch_id=branch_id,
         seller_id=seller_id,
@@ -102,7 +103,7 @@ async def create_sale(
         paid_card=payload.paid_card,
         paid_debt=payload.paid_debt,
         payment_type=payload.payment_type,
-        total_amount=0,
+        total_amount=Decimal("0"),
     )
     db.add(sale)
     db.flush()
@@ -117,7 +118,10 @@ async def create_sale(
         if not stock or stock.quantity < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
 
-        line_total = (item.price - item.discount) * item.quantity
+        price = Decimal(str(item.price))
+        discount = Decimal(str(item.discount))
+        quantity = Decimal(item.quantity)
+        line_total = (price - discount) * quantity
         adjust_stock(db, branch_id, item.product_id, -item.quantity)
         product.quantity = max(product.quantity - item.quantity, 0)
 
@@ -127,13 +131,19 @@ async def create_sale(
             quantity=item.quantity,
             price=item.price,
             discount=item.discount,
-            total=line_total,
+            total=float(line_total),
         )
         db.add(sale_item)
         total += line_total
 
-    paid_total = payload.paid_cash + payload.paid_card + payload.paid_debt
-    if round(paid_total - total, 2) != 0:
+    paid_total = (
+        Decimal(str(payload.paid_cash))
+        + Decimal(str(payload.paid_card))
+        + Decimal(str(payload.paid_debt))
+    )
+    total = total.quantize(Decimal("0.01"))
+    paid_total = paid_total.quantize(Decimal("0.01"))
+    if paid_total != total:
         raise HTTPException(status_code=400, detail="Сумма оплаты не совпадает с итогом")
 
     sale.total_amount = total

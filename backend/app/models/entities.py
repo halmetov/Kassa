@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -120,7 +121,7 @@ class Sale(Base, TimestampMixin):
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
     seller_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     client_id: Mapped[Optional[int]] = mapped_column(ForeignKey("clients.id"), nullable=True)
-    total_amount: Mapped[float] = mapped_column(Float, default=0)
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
     paid_cash: Mapped[float] = mapped_column(Float, default=0)
     paid_card: Mapped[float] = mapped_column(Float, default=0)
     paid_debt: Mapped[float] = mapped_column(Float, default=0)
