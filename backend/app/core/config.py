@@ -13,11 +13,21 @@ class Settings(BaseSettings):
     vite_host: str | None = None
     vite_port: int | None = None
 
+    environment: str = "dev"
+    auto_run_migrations: bool = True
+    autogenerate_migrations: bool | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @property
+    def should_autogenerate_migrations(self) -> bool:
+        if self.autogenerate_migrations is not None:
+            return self.autogenerate_migrations
+        return self.environment.lower() in {"dev", "development"}
 
 
 @lru_cache(maxsize=1)

@@ -15,8 +15,8 @@ from app.api import (
     routes_users,
 )
 from app.core.config import get_settings
-from app.database.base import Base
-from app.database.session import SessionLocal, engine
+from app.database.session import SessionLocal
+from app.database.migrations import run_migrations_on_startup
 from app.auth.security import get_password_hash
 from app.models.user import User
 
@@ -29,7 +29,7 @@ app = FastAPI(title="Kassa API", version="1.0.0")
 
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+    run_migrations_on_startup(settings)
 
     db = SessionLocal()
     try:
