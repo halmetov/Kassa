@@ -7,6 +7,7 @@ from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.enums import MovementStatus
 from app.database.base import Base
 from app.models.mixins import TimestampMixin
 
@@ -56,6 +57,12 @@ class Branch(Base, TimestampMixin):
 
     stock_items: Mapped[List[Stock]] = relationship(back_populates="branch")
     users: Mapped[List["User"]] = relationship("User", back_populates="branch")
+    outgoing_movements: Mapped[List["Movement"]] = relationship(
+        "Movement", back_populates="from_branch", foreign_keys="Movement.from_branch_id"
+    )
+    incoming_movements: Mapped[List["Movement"]] = relationship(
+        "Movement", back_populates="to_branch", foreign_keys="Movement.to_branch_id"
+    )
 
 
 class Stock(Base, TimestampMixin):
@@ -68,6 +75,42 @@ class Stock(Base, TimestampMixin):
 
     branch: Mapped[Branch] = relationship(back_populates="stock_items")
     product: Mapped[Product] = relationship(back_populates="stocks")
+
+
+class Movement(Base, TimestampMixin):
+    __tablename__ = "movements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    from_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"))
+    to_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"))
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(50), default=MovementStatus.DRAFT.value)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    from_branch: Mapped[Branch] = relationship(
+        "Branch", foreign_keys=[from_branch_id], back_populates="outgoing_movements"
+    )
+    to_branch: Mapped[Branch] = relationship(
+        "Branch", foreign_keys=[to_branch_id], back_populates="incoming_movements"
+    )
+    created_by: Mapped[Optional["User"]] = relationship("User", back_populates="movements_created")
+    items: Mapped[List["MovementItem"]] = relationship(
+        "MovementItem", back_populates="movement", cascade="all, delete-orphan"
+    )
+
+
+class MovementItem(Base):
+    __tablename__ = "movement_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    movement_id: Mapped[int] = mapped_column(ForeignKey("movements.id", ondelete="CASCADE"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    quantity: Mapped[int] = mapped_column(Integer)
+    purchase_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    selling_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    movement: Mapped[Movement] = relationship("Movement", back_populates="items")
+    product: Mapped[Product] = relationship("Product")
 
 
 class Income(Base, TimestampMixin):
