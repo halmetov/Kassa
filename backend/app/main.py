@@ -10,7 +10,9 @@ from app.api import (
     routes_income,
     routes_products,
     routes_reports,
+    routes_pos,
     routes_returns,
+    routes_movements,
     routes_sales,
     routes_users,
 )
@@ -70,8 +72,10 @@ app.include_router(routes_branches.router, prefix="/api/branches", tags=["branch
 app.include_router(routes_income.router, prefix="/api/income", tags=["income"])
 app.include_router(routes_sales.router, prefix="/api/sales", tags=["sales"])
 app.include_router(routes_clients.router, prefix="/api/clients", tags=["clients"])
+app.include_router(routes_pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"])
+app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])
 
 app.mount("/static", StaticFiles(directory=settings.media_root), name="static")
 

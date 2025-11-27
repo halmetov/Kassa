@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-
-from alembic import command
-from alembic.config import Config
+from typing import TYPE_CHECKING
 
 from app.core.config import Settings
 
@@ -14,8 +12,32 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 ALEMBIC_CONFIG_PATH = BACKEND_DIR / "alembic.ini"
 MIGRATIONS_PATH = BACKEND_DIR / "migrations"
 
+if TYPE_CHECKING:  # pragma: no cover - only for type checkers
+    from alembic.config import Config
 
-def create_alembic_config(settings: Settings) -> Config:
+
+def _safe_import_alembic():
+    try:
+        from alembic import command  # type: ignore
+        from alembic.config import Config  # type: ignore
+    except ModuleNotFoundError:
+        LOGGER.warning(
+            "Alembic is not installed; skipping automatic migrations. "
+            "Install Alembic to enable database migrations."
+        )
+        return None, None
+    return command, Config
+
+
+def create_alembic_config(settings: Settings):
+    _, Config = _safe_import_alembic()
+    if Config is None:
+        return None
+
+    if not ALEMBIC_CONFIG_PATH.exists():
+        LOGGER.warning("alembic.ini not found at %s; skipping migrations", ALEMBIC_CONFIG_PATH)
+        return None
+
     config = Config(str(ALEMBIC_CONFIG_PATH))
     config.set_main_option("script_location", str(MIGRATIONS_PATH))
     config.set_main_option("sqlalchemy.url", settings.database_url)
@@ -23,7 +45,7 @@ def create_alembic_config(settings: Settings) -> Config:
     return config
 
 
-def _generate_revision_if_needed(config: Config, message: str) -> None:
+def _generate_revision_if_needed(command, config: Config, message: str) -> None:
     def process_revision_directives(context, revision, directives):
         if directives and directives[0].upgrade_ops.is_empty():
             LOGGER.info("No schema changes detected; skipping revision generation.")
@@ -39,12 +61,18 @@ def run_migrations_on_startup(settings: Settings) -> None:
         LOGGER.info("Automatic migrations disabled; skipping upgrade.")
         return
 
+    command, _ = _safe_import_alembic()
+    if command is None:
+        return
+
     config = create_alembic_config(settings)
+    if config is None:
+        return
 
     autogenerate = settings.should_autogenerate_migrations
     if autogenerate:
         LOGGER.info("Autogenerating migrations based on current models.")
-        _generate_revision_if_needed(config, "Auto generated migration")
+        _generate_revision_if_needed(command, config, "Auto generated migration")
     else:
         LOGGER.info("Autogenerate disabled; applying existing migrations only.")
 

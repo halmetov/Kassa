@@ -48,6 +48,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    movements_created = relationship(
+        "Movement",
+        back_populates="created_by",
+        cascade="all, delete-orphan",
+    )
+
     logs = relationship(
         "Log",
         back_populates="created_by",
