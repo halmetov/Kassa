@@ -1,4 +1,6 @@
 from functools import lru_cache
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +30,17 @@ class Settings(BaseSettings):
         if self.autogenerate_migrations is not None:
             return self.autogenerate_migrations
         return self.environment.lower() in {"dev", "development"}
+
+    @property
+    def project_root(self) -> Path:
+        return Path(__file__).resolve().parents[2]
+
+    @property
+    def media_root_path(self) -> Path:
+        media_root = Path(self.media_root)
+        if not media_root.is_absolute():
+            media_root = self.project_root / media_root
+        return media_root
 
 
 @lru_cache(maxsize=1)

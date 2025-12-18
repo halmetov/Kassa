@@ -1,10 +1,20 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.engine import Engine
 
 from app.core.config import get_settings
 
 settings = get_settings()
-engine = create_engine(settings.database_url, echo=False, future=True)
+
+
+def create_sync_engine(url: str) -> Engine:
+    connect_args = {}
+    if url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+    return create_engine(url, echo=False, future=True, connect_args=connect_args)
+
+
+engine = create_sync_engine(settings.database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

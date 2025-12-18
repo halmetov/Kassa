@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
 from app.api import (
     routes_auth,
     routes_branches,
@@ -77,7 +76,9 @@ app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"
 app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"])
 app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])
 
-app.mount("/static", StaticFiles(directory=settings.media_root), name="static")
+media_root = settings.media_root_path
+media_root.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=media_root), name="static")
 
 
 @app.get("/health", tags=["system"])
