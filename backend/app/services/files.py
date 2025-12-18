@@ -12,7 +12,7 @@ settings = get_settings()
 async def save_upload(file: UploadFile) -> str:
     ext = Path(file.filename or "upload").suffix
     filename = f"product_{os.urandom(8).hex()}{ext}"
-    media_dir = Path(settings.media_root)
+    media_dir = settings.media_root_path
     media_dir.mkdir(parents=True, exist_ok=True)
     destination = media_dir / filename
 

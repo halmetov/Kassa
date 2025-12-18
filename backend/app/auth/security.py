@@ -15,7 +15,7 @@ from app.models.user import User
 
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def get_user_by_login(db: Session, login: str) -> User | None:

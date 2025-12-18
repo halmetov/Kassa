@@ -83,7 +83,9 @@ class Movement(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     from_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"))
     to_branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"))
-    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(50), default=MovementStatus.DRAFT.value)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
