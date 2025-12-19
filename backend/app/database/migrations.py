@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sqlalchemy.exc import OperationalError
+
 from app.core.config import Settings
 
 LOGGER = logging.getLogger(__name__)
@@ -69,11 +71,18 @@ def run_migrations_on_startup(settings: Settings) -> None:
     if config is None:
         return
 
-    autogenerate = settings.should_autogenerate_migrations
-    if autogenerate:
-        LOGGER.info("Autogenerating migrations based on current models.")
-        _generate_revision_if_needed(command, config, "Auto generated migration")
-    else:
-        LOGGER.info("Autogenerate disabled; applying existing migrations only.")
+    try:
+        autogenerate = settings.should_autogenerate_migrations
+        if autogenerate:
+            LOGGER.info("Autogenerating migrations based on current models.")
+            _generate_revision_if_needed(command, config, "Auto generated migration")
+        else:
+            LOGGER.info("Autogenerate disabled; applying existing migrations only.")
 
-    command.upgrade(config, "head")
+        command.upgrade(config, "head")
+    except OperationalError as exc:
+        LOGGER.error(
+            "Skipping automatic migrations; database is not reachable (%s)", exc, exc_info=True
+        )
+    except Exception:
+        LOGGER.exception("Failed to run automatic migrations; startup will continue without them.")

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -20,33 +22,57 @@ from app.database.session import SessionLocal
 from app.database.migrations import run_migrations_on_startup
 from app.auth.security import get_password_hash
 from app.models.user import User
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 import app.models  # noqa: F401 - ensure models are imported for metadata
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Kassa API", version="1.0.0")
 
 
+def is_database_available() -> bool:
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        return True
+    except SQLAlchemyError:
+        logger.exception(
+            "Database is not available; skipping migrations and admin bootstrap during startup."
+        )
+        return False
+
+
 @app.on_event("startup")
 def on_startup() -> None:
-    run_migrations_on_startup(settings)
+    if not is_database_available():
+        return
 
-    db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.login == "admin").first()
-        if admin is None:
-            new_admin = User(
-                name="Admin",
-                login="admin",
-                password_hash=get_password_hash("admin"),
-                role="admin",
-                active=True,
-            )
-            db.add(new_admin)
-            db.commit()
-    finally:
-        db.close()
+        run_migrations_on_startup(settings)
+    except Exception:
+        logger.exception("Startup migrations failed; continuing without applying migrations.")
+
+    try:
+        db = SessionLocal()
+        try:
+            admin = db.query(User).filter(User.login == "admin").first()
+            if admin is None:
+                new_admin = User(
+                    name="Admin",
+                    login="admin",
+                    password_hash=get_password_hash("admin"),
+                    role="admin",
+                    active=True,
+                )
+                db.add(new_admin)
+                db.commit()
+        finally:
+            db.close()
+    except SQLAlchemyError:
+        logger.exception("Database is not available during startup; skipping admin bootstrap.")
 
 ALLOWED_ORIGINS = [
     "http://localhost:8080",
@@ -79,6 +105,11 @@ app.include_router(routes_movements.router, prefix="/api/movements", tags=["move
 media_root = settings.media_root_path
 media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=media_root), name="static")
+
+
+@app.get("/api/health", tags=["system"])
+def api_healthcheck() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.get("/health", tags=["system"])

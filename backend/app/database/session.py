@@ -11,6 +11,8 @@ def create_sync_engine(url: str) -> Engine:
     connect_args = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
+    elif url.startswith("postgresql"):
+        connect_args["connect_timeout"] = 5
     return create_engine(url, echo=False, future=True, connect_args=connect_args)
 
 
