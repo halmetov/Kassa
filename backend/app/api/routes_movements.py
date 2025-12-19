@@ -19,7 +19,7 @@ from app.schemas.movements import (
 )
 from app.services.inventory import adjust_stock
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 def _validate_branch_access(branch_id: int, current_user: User) -> None:
@@ -63,7 +63,6 @@ def _date_bounds(dt: date, start: bool) -> datetime:
 
 
 @router.get("", response_model=list[MovementSummary], dependencies=[Depends(require_employee)])
-@router.get("/", response_model=list[MovementSummary], dependencies=[Depends(require_employee)])
 async def list_movements(
     from_branch_id: int | None = None,
     to_branch_id: int | None = None,
@@ -103,12 +102,6 @@ async def list_movements(
 
 @router.post(
     "",
-    response_model=MovementDetail,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_employee)],
-)
-@router.post(
-    "/",
     response_model=MovementDetail,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_employee)],

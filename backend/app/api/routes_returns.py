@@ -13,7 +13,7 @@ from app.models.user import User
 from app.schemas import returns as return_schema
 from app.services.inventory import adjust_stock
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 def _apply_date_filters(query, start_date: date | None, end_date: date | None):
@@ -89,7 +89,6 @@ def _build_return_items(
 
 
 @router.post("", response_model=return_schema.ReturnDetail, status_code=status.HTTP_201_CREATED)
-@router.post("/", response_model=return_schema.ReturnDetail, status_code=status.HTTP_201_CREATED)
 async def create_return(
     payload: return_schema.ReturnCreate,
     db: Session = Depends(get_db),
@@ -126,7 +125,6 @@ async def create_return(
 
 
 @router.get("", response_model=list[return_schema.ReturnSummary])
-@router.get("/", response_model=list[return_schema.ReturnSummary])
 async def list_returns(
     start_date: date | None = None,
     end_date: date | None = None,

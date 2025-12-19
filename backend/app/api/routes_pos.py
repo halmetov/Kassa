@@ -10,7 +10,7 @@ from app.models.entities import Branch, Product, Stock
 from app.models.user import User
 from app.schemas.pos import PosProduct
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 def _resolve_branch_scope(branch_id: int | None, current_user: User) -> int | None:
@@ -66,4 +66,3 @@ async def search_products_for_pos(
         )
 
     return items
-

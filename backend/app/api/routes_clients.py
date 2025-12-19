@@ -7,11 +7,10 @@ from app.database.session import get_db
 from app.models.entities import Client
 from app.schemas import clients as client_schema
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 @router.get("", response_model=list[client_schema.Client], dependencies=[Depends(require_employee)])
-@router.get("/", response_model=list[client_schema.Client], dependencies=[Depends(require_employee)])
 async def list_clients(db: Session = Depends(get_db)):
     result = db.execute(select(Client))
     return result.scalars().all()
@@ -19,12 +18,6 @@ async def list_clients(db: Session = Depends(get_db)):
 
 @router.post(
     "",
-    response_model=client_schema.Client,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_employee)],
-)
-@router.post(
-    "/",
     response_model=client_schema.Client,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_employee)],

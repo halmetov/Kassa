@@ -12,11 +12,10 @@ from app.schemas import stock as stock_schema
 from app.schemas import products as product_schema
 from app.services.files import save_upload
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 @router.get("", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
-@router.get("/", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
 async def list_products(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
@@ -41,7 +40,6 @@ async def list_products(
 
 
 @router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
-@router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
     product = Product(**payload.dict())
     db.add(product)

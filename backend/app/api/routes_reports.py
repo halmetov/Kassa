@@ -9,7 +9,7 @@ from app.database.session import get_db
 from app.models.entities import Branch, Product, Sale, SaleItem, User
 from app.schemas import reports as report_schema
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 def _apply_date_filters(query, start_date: date | None, end_date: date | None):
