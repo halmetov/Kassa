@@ -19,7 +19,7 @@ from app.models.user import User
 
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+password_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
 logger = logging.getLogger(__name__)
 
 
@@ -76,6 +76,7 @@ def get_password_hash(password: str) -> str:
 
 def authenticate(db: Session, login: str | None, password: str | None) -> User:
     if not login or not password:
+        logger.warning("Authentication attempt with missing credentials (login=%s)", login)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
 
     try:
@@ -95,7 +96,14 @@ def authenticate(db: Session, login: str | None, password: str | None) -> User:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
         ) from exc
 
-    if not user or not is_valid_password or not user.active:
+    if not user:
+        logger.warning("Authentication failed: user %s not found", login)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
+    if not is_valid_password:
+        logger.warning("Authentication failed: invalid password for user %s", login)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
+    if not user.active:
+        logger.warning("Authentication failed: inactive user %s", login)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
 
     return user

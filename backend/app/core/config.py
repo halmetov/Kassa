@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     environment: str = "dev"
     auto_run_migrations: bool = True
     autogenerate_migrations: bool | None = None
+    admin_password: str = Field("admin", env="ADMIN_PASSWORD")
 
     cors_origins: str | None = Field(default=None, env="CORS_ORIGINS")
     cors_origin_regex: str | None = Field(default=None, env="CORS_ORIGIN_REGEX")

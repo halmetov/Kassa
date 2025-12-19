@@ -10,16 +10,11 @@ from app.models.entities import Branch, Product, Stock
 from app.models.user import User
 from app.schemas import branches as branch_schema
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 @router.get(
     "",
-    response_model=list[branch_schema.Branch],
-    dependencies=[Depends(require_employee)],
-)
-@router.get(
-    "/",
     response_model=list[branch_schema.Branch],
     dependencies=[Depends(require_employee)],
 )
@@ -36,7 +31,6 @@ async def list_branches(
 
 
 @router.post("", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
-@router.post("/", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
 async def create_branch(payload: branch_schema.BranchCreate, db: Session = Depends(get_db)):
     branch = Branch(**payload.dict())
     db.add(branch)

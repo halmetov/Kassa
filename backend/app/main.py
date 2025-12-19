@@ -21,7 +21,7 @@ from app.api import (
 from app.core.config import get_settings
 from app.database.session import SessionLocal
 from app.database.migrations import run_migrations_on_startup
-from app.auth.security import get_password_hash
+from app.auth.security import get_password_hash, verify_password
 from app.models.user import User
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -65,21 +65,25 @@ def on_startup() -> None:
         logger.exception("Startup migrations failed; continuing without applying migrations.")
 
     try:
-        db = SessionLocal()
-        try:
+        with SessionLocal() as db:
             admin = db.query(User).filter(User.login == "admin").first()
+            desired_password = settings.admin_password
             if admin is None:
                 new_admin = User(
                     name="Admin",
                     login="admin",
-                    password_hash=get_password_hash("admin"),
+                    password_hash=get_password_hash(desired_password),
                     role="admin",
                     active=True,
                 )
                 db.add(new_admin)
                 db.commit()
-        finally:
-            db.close()
+                logger.info("Bootstrap admin user created with provided credentials.")
+            else:
+                if desired_password and not verify_password(desired_password, admin.password_hash):
+                    admin.password_hash = get_password_hash(desired_password)
+                    db.commit()
+                    logger.info("Bootstrap admin password updated from ADMIN_PASSWORD.")
     except SQLAlchemyError:
         logger.exception("Database is not available during startup; skipping admin bootstrap.")
 
