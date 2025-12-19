@@ -5,6 +5,14 @@ const jsonHeaders = {
   "Content-Type": "application/json",
 };
 
+function normalizeApiPath(path: string): string {
+  if (!path) return path;
+  const [pathname, query] = path.split("?");
+  const normalizedPath =
+    pathname.endsWith("/") && pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
+  return query ? `${normalizedPath}?${query}` : normalizedPath;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const message = await response.text();
@@ -22,7 +30,8 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const response = await fetch(`${API_URL}${path}`, {
+  const normalizedPath = normalizeApiPath(path);
+  const response = await fetch(`${API_URL}${normalizedPath}`, {
     credentials: "include",
     ...options,
     headers,
