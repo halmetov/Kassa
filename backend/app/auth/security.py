@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.exc import InvalidHash
+from passlib import exc as passlib_exc
 from passlib.context import CryptContext
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -55,8 +55,13 @@ def create_refresh_token(data: dict) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         return password_context.verify(plain, hashed)
-    except (InvalidHash, ValueError, TypeError) as exc:
-        raise exc
+    except ValueError:
+        return False
+    except passlib_exc.PasslibError:
+        return False
+    except Exception:  # pragma: no cover - defensive guard against unexpected errors
+        logger.exception("Unexpected error verifying password")
+        return False
 
 
 def hash_password(password: str) -> str:
