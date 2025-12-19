@@ -10,12 +10,14 @@ from app.schemas import categories as category_schema
 router = APIRouter()
 
 
+@router.get("", response_model=list[category_schema.Category], dependencies=[Depends(require_employee)])
 @router.get("/", response_model=list[category_schema.Category], dependencies=[Depends(require_employee)])
 async def list_categories(db: Session = Depends(get_db)):
     result = db.execute(select(Category).order_by(Category.name))
     return result.scalars().all()
 
 
+@router.post("", response_model=category_schema.Category, dependencies=[Depends(require_employee)])
 @router.post("/", response_model=category_schema.Category, dependencies=[Depends(require_employee)])
 async def create_category(payload: category_schema.CategoryCreate, db: Session = Depends(get_db)):
     category = Category(name=payload.name)

@@ -24,6 +24,7 @@ def _resolve_branch(branch_id: int | None, current_user: User) -> int:
     return branch_id
 
 
+@router.get("", response_model=list[income_schema.Income], dependencies=[Depends(require_employee)])
 @router.get("/", response_model=list[income_schema.Income], dependencies=[Depends(require_employee)])
 async def list_income(
     branch_id: int | None = None,
@@ -41,6 +42,12 @@ async def list_income(
     return incomes
 
 
+@router.post(
+    "",
+    response_model=income_schema.Income,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_employee)],
+)
 @router.post(
     "/",
     response_model=income_schema.Income,

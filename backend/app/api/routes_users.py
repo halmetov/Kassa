@@ -10,12 +10,14 @@ from app.schemas import users as user_schema
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
+@router.get("", response_model=list[user_schema.User])
 @router.get("/", response_model=list[user_schema.User])
 async def list_users(db: Session = Depends(get_db)):
     result = db.execute(select(User))
     return result.scalars().all()
 
 
+@router.post("", response_model=user_schema.User, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=user_schema.User, status_code=status.HTTP_201_CREATED)
 async def create_user(payload: user_schema.UserCreate, db: Session = Depends(get_db)):
     exists = db.execute(select(User).where(User.login == payload.login))

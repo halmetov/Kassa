@@ -15,6 +15,7 @@ from app.services.files import save_upload
 router = APIRouter()
 
 
+@router.get("", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
 @router.get("/", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
 async def list_products(
     branch_id: int | None = None,
@@ -39,6 +40,7 @@ async def list_products(
     return result.scalars().all()
 
 
+@router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 @router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
     product = Product(**payload.dict())
