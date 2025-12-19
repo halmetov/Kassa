@@ -39,6 +39,7 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="Kassa API", version="1.0.0", redirect_slashes=False)
+app.router.redirect_slashes = False
 
 
 def is_database_available() -> bool:
@@ -85,6 +86,7 @@ def on_startup() -> None:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_cors_origins,
+    allow_origin_regex=settings.allowed_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

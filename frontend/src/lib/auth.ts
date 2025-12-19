@@ -35,13 +35,21 @@ export async function login(login: string, password: string) {
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({ login, password }),
+    body: new URLSearchParams({ username: login, password }).toString(),
   });
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || "Неверный логин или пароль");
+    const errorText = await response.text();
+    try {
+      const json = JSON.parse(errorText);
+      if (json?.detail) {
+        throw new Error(json.detail);
+      }
+    } catch {
+      // Ignore JSON parse errors and fall back to raw text
+    }
+    throw new Error(errorText || "Неверный логин или пароль");
   }
   const data = await response.json();
   setTokens(data.access_token, data.refresh_token);

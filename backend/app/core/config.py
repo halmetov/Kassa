@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     autogenerate_migrations: bool | None = None
 
     cors_origins: str | None = Field(default=None, env="CORS_ORIGINS")
+    cors_origin_regex: str | None = Field(default=None, env="CORS_ORIGIN_REGEX")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -61,6 +62,14 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
             "http://192.168.8.102:5173",
         ]
+
+    @property
+    def allowed_cors_regex(self) -> str | None:
+        if self.cors_origin_regex:
+            return self.cors_origin_regex
+        if self.environment.lower() in {"dev", "development"}:
+            return r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):8080$"
+        return None
 
 
 @lru_cache(maxsize=1)
