@@ -12,11 +12,14 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: str
+    user_id: int
+    role: str
+    branch_id: int | None = None
     exp: int
 
 
 class LoginRequest(BaseModel):
-    username: str
+    login: str
     password: str
 
 

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { getCurrentUser, login } from "@/lib/auth";
 
 export default function Auth() {
-  const [username, setUsername] = useState("");
+  const [loginValue, setLoginValue] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      await login(username, password);
+      await login(loginValue, password);
       toast.success("Вход выполнен успешно");
       navigate('/');
     } catch (error: any) {
@@ -48,11 +48,11 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Логин</Label>
+              <Label htmlFor="login">Логин</Label>
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="login"
+                value={loginValue}
+                onChange={(e) => setLoginValue(e.target.value)}
                 required
               />
             </div>
