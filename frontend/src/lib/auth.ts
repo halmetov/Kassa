@@ -40,15 +40,13 @@ export async function login(login: string, password: string) {
     body: new URLSearchParams({ username: login, password }).toString(),
   });
   if (!response.ok) {
-    const errorText = await response.text();
-    try {
-      const json = JSON.parse(errorText);
-      if (json?.detail) {
-        throw new Error(json.detail);
-      }
-    } catch {
-      // Ignore JSON parse errors and fall back to raw text
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const error = await response.json().catch(() => null);
+      const detail = error?.detail;
+      throw new Error(detail || "Неверный логин или пароль");
     }
+    const errorText = await response.text();
     throw new Error(errorText || "Неверный логин или пароль");
   }
   const data = await response.json();

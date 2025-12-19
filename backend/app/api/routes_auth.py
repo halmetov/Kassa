@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -18,9 +18,19 @@ from app.schemas import auth as auth_schema
 from jose import JWTError, jwt
 from app.core.config import get_settings
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+
+async def _extract_credentials(request: Request) -> tuple[str | None, str | None]:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        payload = await request.json()
+        return payload.get("login"), payload.get("password")
+
+    form = await request.form()
+    return (form.get("username") or form.get("login")), form.get("password")
 
 
 @router.post("/login", response_model=auth_schema.Token)
@@ -32,27 +42,22 @@ async def login(request: Request, db: Session = Depends(get_db)):
     """
     login_value: str | None = None
     try:
-        content_type = request.headers.get("content-type", "")
-        if content_type.startswith("application/json"):
-            payload = await request.json()
-            login_value = payload.get("login")
-            password = payload.get("password")
-        else:
-            form = await request.form()
-            login_value = form.get("username")
-            password = form.get("password")
-
+        login_value, password = await _extract_credentials(request)
         user = authenticate(db, login_value, password)
         token_payload = {
             "sub": str(user.id),
             "user_id": user.id,
-            "role": user.role,
+            "role": str(user.role),
             "branch_id": user.branch_id,
         }
         access_token = create_access_token(token_payload)
         refresh_token = create_refresh_token(token_payload)
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
-    except HTTPException:
+    except HTTPException as exc:
+        if exc.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
+            logger.exception("HTTPException during login for user %s", login_value)
+        else:
+            logger.info("Authentication failed for user %s: %s", login_value, exc.detail)
         raise
     except SQLAlchemyError as exc:
         logger.exception("Database error during login for user %s", login_value)
@@ -92,7 +97,7 @@ async def refresh_token(payload: auth_schema.RefreshRequest, db: Session = Depen
     token_payload = {
         "sub": str(user.id),
         "user_id": user.id,
-        "role": user.role,
+        "role": str(user.role),
         "branch_id": user.branch_id,
     }
     access_token = create_access_token(token_payload)

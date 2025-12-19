@@ -11,7 +11,7 @@ from app.models.user import User
 from app.schemas import income as income_schema
 from app.services.inventory import adjust_stock
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 def _resolve_branch(branch_id: int | None, current_user: User) -> int:
@@ -25,7 +25,6 @@ def _resolve_branch(branch_id: int | None, current_user: User) -> int:
 
 
 @router.get("", response_model=list[income_schema.Income], dependencies=[Depends(require_employee)])
-@router.get("/", response_model=list[income_schema.Income], dependencies=[Depends(require_employee)])
 async def list_income(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
@@ -44,12 +43,6 @@ async def list_income(
 
 @router.post(
     "",
-    response_model=income_schema.Income,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_employee)],
-)
-@router.post(
-    "/",
     response_model=income_schema.Income,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_employee)],
