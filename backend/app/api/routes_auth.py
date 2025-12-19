@@ -11,6 +11,7 @@ from app.auth.security import (
     create_access_token,
     create_refresh_token,
     get_current_user,
+    get_role_value,
 )
 from app.database.session import get_db
 from app.models.user import User
@@ -44,10 +45,11 @@ async def login(request: Request, db: Session = Depends(get_db)):
     try:
         login_value, password = await _extract_credentials(request)
         user = authenticate(db, login_value, password)
+        role_value = get_role_value(user.role)
         token_payload = {
             "sub": str(user.id),
             "user_id": user.id,
-            "role": str(user.role),
+            "role": role_value,
             "branch_id": user.branch_id,
         }
         access_token = create_access_token(token_payload)
@@ -73,7 +75,7 @@ async def get_profile(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         login=current_user.login,
         name=current_user.name,
-        role=current_user.role,
+        role=get_role_value(current_user.role),
         active=current_user.active,
         branch_id=current_user.branch_id,
         branch_name=current_user.branch.name if current_user.branch else None,
@@ -94,10 +96,11 @@ async def refresh_token(payload: auth_schema.RefreshRequest, db: Session = Depen
         raise HTTPException(status_code=500, detail="Internal server error") from exc
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    role_value = get_role_value(user.role)
     token_payload = {
         "sub": str(user.id),
         "user_id": user.id,
-        "role": str(user.role),
+        "role": role_value,
         "branch_id": user.branch_id,
     }
     access_token = create_access_token(token_payload)

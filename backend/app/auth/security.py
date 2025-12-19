@@ -6,12 +6,14 @@ from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+from passlib.exc import InvalidHash
 from passlib.context import CryptContext
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.enums import UserRole
 from app.database.session import get_db
 from app.models.user import User
 
@@ -19,6 +21,12 @@ settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 logger = logging.getLogger(__name__)
+
+
+def get_role_value(role: UserRole | str | None) -> str | None:
+    if role is None:
+        return None
+    return role.value if isinstance(role, UserRole) else str(role)
 
 
 def get_user_by_login(db: Session, login: str) -> User | None:
@@ -45,7 +53,10 @@ def create_refresh_token(data: dict) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return password_context.verify(plain, hashed)
+    try:
+        return password_context.verify(plain, hashed)
+    except (InvalidHash, ValueError, TypeError) as exc:
+        raise exc
 
 
 def hash_password(password: str) -> str:
@@ -71,7 +82,15 @@ def authenticate(db: Session, login: str | None, password: str | None) -> User:
         logger.exception("Unexpected error during login for user %s", login)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from exc
 
-    if not user or not verify_password(password, user.password_hash) or not user.active:
+    try:
+        is_valid_password = verify_password(password, user.password_hash) if user else False
+    except Exception as exc:
+        logger.exception("Password verification failed for user %s", login)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error"
+        ) from exc
+
+    if not user or not is_valid_password or not user.active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed")
 
     return user
@@ -103,12 +122,14 @@ async def get_current_user(
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin":
+    role_value = get_role_value(current_user.role)
+    if role_value != UserRole.ADMIN.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user
 
 
 def require_employee(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {"admin", "employee"}:
+    role_value = get_role_value(current_user.role)
+    if role_value not in {UserRole.ADMIN.value, UserRole.EMPLOYEE.value}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user
