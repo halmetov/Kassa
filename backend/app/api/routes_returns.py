@@ -88,6 +88,7 @@ def _build_return_items(
     return return_items
 
 
+@router.post("", response_model=return_schema.ReturnDetail, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=return_schema.ReturnDetail, status_code=status.HTTP_201_CREATED)
 async def create_return(
     payload: return_schema.ReturnCreate,
@@ -124,6 +125,7 @@ async def create_return(
     return await get_return_detail(return_entry.id, db=db, current_user=current_user)
 
 
+@router.get("", response_model=list[return_schema.ReturnSummary])
 @router.get("/", response_model=list[return_schema.ReturnSummary])
 async def list_returns(
     start_date: date | None = None,

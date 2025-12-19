@@ -14,6 +14,11 @@ router = APIRouter()
 
 
 @router.get(
+    "",
+    response_model=list[branch_schema.Branch],
+    dependencies=[Depends(require_employee)],
+)
+@router.get(
     "/",
     response_model=list[branch_schema.Branch],
     dependencies=[Depends(require_employee)],
@@ -30,6 +35,7 @@ async def list_branches(
     return result.scalars().all()
 
 
+@router.post("", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
 @router.post("/", response_model=branch_schema.Branch, dependencies=[Depends(require_admin)])
 async def create_branch(payload: branch_schema.BranchCreate, db: Session = Depends(get_db)):
     branch = Branch(**payload.dict())

@@ -62,6 +62,7 @@ def _date_bounds(dt: date, start: bool) -> datetime:
     return datetime.combine(dt, time.min if start else time.max)
 
 
+@router.get("", response_model=list[MovementSummary], dependencies=[Depends(require_employee)])
 @router.get("/", response_model=list[MovementSummary], dependencies=[Depends(require_employee)])
 async def list_movements(
     from_branch_id: int | None = None,
@@ -100,6 +101,12 @@ async def list_movements(
     ]
 
 
+@router.post(
+    "",
+    response_model=MovementDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_employee)],
+)
 @router.post(
     "/",
     response_model=MovementDetail,
@@ -231,4 +238,3 @@ async def get_movement_detail(
         created_by_name=movement.created_by.name if movement.created_by else None,
         items=items,
     )
-

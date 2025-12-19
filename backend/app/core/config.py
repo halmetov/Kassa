@@ -1,6 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
 
+from typing import List
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +21,8 @@ class Settings(BaseSettings):
     environment: str = "dev"
     auto_run_migrations: bool = True
     autogenerate_migrations: bool | None = None
+
+    cors_origins: str | None = Field(default=None, env="CORS_ORIGINS")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,6 +46,21 @@ class Settings(BaseSettings):
         if not media_root.is_absolute():
             media_root = self.project_root / media_root
         return media_root
+
+    @property
+    def allowed_cors_origins(self) -> List[str]:
+        if self.cors_origins:
+            origins = [origin.strip().rstrip("/") for origin in self.cors_origins.split(",")]
+            return [origin for origin in origins if origin]
+
+        return [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://192.168.8.102:8080",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://192.168.8.102:5173",
+        ]
 
 
 @lru_cache(maxsize=1)

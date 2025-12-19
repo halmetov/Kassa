@@ -51,6 +51,7 @@ def _map_sale_to_summary(sale: Sale) -> sales_schema.SaleSummary:
     )
 
 
+@router.get("", response_model=list[sales_schema.SaleSummary])
 @router.get("/", response_model=list[sales_schema.SaleSummary])
 async def list_sales(
     start_date: date | None = None,
@@ -76,6 +77,7 @@ async def list_sales(
     return [_map_sale_to_summary(sale) for sale in sales]
 
 
+@router.post("", response_model=sales_schema.SaleDetail, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=sales_schema.SaleDetail, status_code=status.HTTP_201_CREATED)
 async def create_sale(
     payload: sales_schema.SaleCreate,

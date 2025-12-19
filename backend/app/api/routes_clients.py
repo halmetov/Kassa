@@ -10,12 +10,19 @@ from app.schemas import clients as client_schema
 router = APIRouter()
 
 
+@router.get("", response_model=list[client_schema.Client], dependencies=[Depends(require_employee)])
 @router.get("/", response_model=list[client_schema.Client], dependencies=[Depends(require_employee)])
 async def list_clients(db: Session = Depends(get_db)):
     result = db.execute(select(Client))
     return result.scalars().all()
 
 
+@router.post(
+    "",
+    response_model=client_schema.Client,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_employee)],
+)
 @router.post(
     "/",
     response_model=client_schema.Client,

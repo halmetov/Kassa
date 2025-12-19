@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +31,14 @@ import app.models  # noqa: F401 - ensure models are imported for metadata
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Kassa API", version="1.0.0")
+# Configure root logger for better debugging (useful for login errors, etc.)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+
+app = FastAPI(title="Kassa API", version="1.0.0", redirect_slashes=False)
 
 
 def is_database_available() -> bool:
@@ -74,16 +82,9 @@ def on_startup() -> None:
     except SQLAlchemyError:
         logger.exception("Database is not available during startup; skipping admin bootstrap.")
 
-ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://192.168.8.98:8080",  # TODO: replace with the active frontend origin if different
-    "http://10.221.89.109:8080"
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=settings.allowed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
