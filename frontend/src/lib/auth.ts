@@ -31,16 +31,13 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-export async function login(username: string, password: string) {
-  const body = new URLSearchParams();
-  body.append("username", username);
-  body.append("password", password);
+export async function login(login: string, password: string) {
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body,
+    body: JSON.stringify({ login, password }),
   });
   if (!response.ok) {
     const message = await response.text();
