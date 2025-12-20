@@ -14,20 +14,21 @@ class ProductBase(BaseModel):
     wholesale_price: float = 0
     limit: int = 0
     image_url: Optional[str] = None
+    photo: Optional[str] = None
 
 
 class ProductCreate(ProductBase):
-    pass
+    class Config:
+        extra = "ignore"
 
 
 class ProductUpdate(ProductBase):
-    pass
+    class Config:
+        extra = "ignore"
 
 
 class Product(ProductBase):
     id: int
-    photo: Optional[str]
-    image_url: Optional[str]
     quantity: int
     created_at: datetime
     updated_at: datetime
