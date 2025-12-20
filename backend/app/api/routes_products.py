@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user, require_admin, require_employee
@@ -12,10 +15,13 @@ from app.schemas import stock as stock_schema
 from app.schemas import products as product_schema
 from app.services.files import save_upload
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(redirect_slashes=False)
 
 
 @router.get("", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
+@router.get("/", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
 async def list_products(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
@@ -40,12 +46,19 @@ async def list_products(
 
 
 @router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
+@router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
-    product = Product(**payload.dict())
-    db.add(product)
-    db.commit()
-    db.refresh(product)
-    return product
+    try:
+        product = Product(**payload.dict(exclude_unset=True))
+        db.add(product)
+        db.commit()
+        db.refresh(product)
+        return product
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to create product: %s", payload.dict())
+        raise HTTPException(status_code=400, detail="Не удалось создать товар. Проверьте данные.") from exc
+
 
 
 @router.put("/{product_id}", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
@@ -53,11 +66,16 @@ async def update_product(product_id: int, payload: product_schema.ProductUpdate,
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    for field, value in payload.dict(exclude_unset=True).items():
-        setattr(product, field, value)
-    db.commit()
-    db.refresh(product)
-    return product
+    try:
+        for field, value in payload.dict(exclude_unset=True).items():
+            setattr(product, field, value)
+        db.commit()
+        db.refresh(product)
+        return product
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to update product %s: %s", product_id, payload.dict(exclude_unset=True))
+        raise HTTPException(status_code=400, detail="Не удалось обновить товар. Проверьте данные.") from exc
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
@@ -65,9 +83,14 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    db.delete(product)
-    db.commit()
-    return None
+    try:
+        db.delete(product)
+        db.commit()
+        return None
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to delete product %s", product_id)
+        raise HTTPException(status_code=400, detail="Не удалось удалить товар.") from exc
 
 
 @router.post("/{product_id}/photo", response_model=product_schema.Product, dependencies=[Depends(require_admin)])
@@ -75,12 +98,17 @@ async def upload_photo(product_id: int, file: UploadFile = File(...), db: Sessio
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    photo_path = await save_upload(file)
-    product.photo = photo_path
-    product.image_url = photo_path
-    db.commit()
-    db.refresh(product)
-    return product
+    try:
+        photo_path = await save_upload(file)
+        product.photo = photo_path
+        product.image_url = photo_path
+        db.commit()
+        db.refresh(product)
+        return product
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Failed to upload photo for product %s", product_id)
+        raise HTTPException(status_code=400, detail="Не удалось загрузить фото товара.") from exc
 
 
 @router.get("/low-stock", response_model=list[stock_schema.LowStockItem], dependencies=[Depends(require_employee)])
