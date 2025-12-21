@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -92,14 +92,20 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{product_id}/photo", response_model=product_schema.Product, dependencies=[Depends(require_admin)])
-async def upload_photo(product_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_photo(
+    product_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     try:
-        photo_path = await save_upload(file)
-        product.photo = photo_path
-        product.image_url = photo_path
+        photo_name = await save_upload(file)
+        public_url = f\"{str(request.base_url).rstrip('/')}/static/{photo_name}\"
+        product.photo = public_url
+        product.image_url = public_url
         db.commit()
         db.refresh(product)
         return product

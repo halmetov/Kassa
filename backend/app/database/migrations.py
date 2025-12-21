@@ -74,11 +74,10 @@ def run_migrations_on_startup(settings: Settings) -> None:
     try:
         autogenerate = settings.should_autogenerate_migrations
         if autogenerate:
-            LOGGER.info("Autogenerating migrations based on current models.")
+            LOGGER.info("Autogenerate enabled via configuration; generating revision if needed.")
             _generate_revision_if_needed(command, config, "Auto generated migration")
         else:
             LOGGER.info("Autogenerate disabled; applying existing migrations only.")
-
         command.upgrade(config, "head")
     except OperationalError as exc:
         LOGGER.error(
@@ -86,3 +85,38 @@ def run_migrations_on_startup(settings: Settings) -> None:
         )
     except Exception:
         LOGGER.exception("Failed to run automatic migrations; startup will continue without them.")
+
+
+def upgrade_head(settings: Settings) -> None:
+    command, _ = _safe_import_alembic()
+    if command is None:
+        raise SystemExit("Alembic is not installed. Install dependencies and try again.")
+
+    config = create_alembic_config(settings)
+    if config is None:
+        raise SystemExit("Alembic configuration not found; cannot run migrations.")
+
+    LOGGER.info("Applying migrations up to head.")
+    command.upgrade(config, "head")
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run Alembic migrations")
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="upgrade",
+        choices=["upgrade"],
+        help="Migration command to run (only 'upgrade' to head is supported).",
+    )
+    args = parser.parse_args()
+
+    settings = Settings()
+    if args.command == "upgrade":
+        upgrade_head(settings)
+
+
+if __name__ == "__main__":
+    main()

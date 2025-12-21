@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     environment: str = "dev"
     auto_run_migrations: bool = True
-    autogenerate_migrations: bool | None = None
+    autogenerate_migrations: bool | None = Field(default=False, env="AUTO_GENERATE_MIGRATIONS")
     admin_password: str = Field("admin", env="ADMIN_PASSWORD")
 
     cors_origins: str | None = Field(default=None, env="CORS_ORIGINS")
@@ -34,9 +34,7 @@ class Settings(BaseSettings):
 
     @property
     def should_autogenerate_migrations(self) -> bool:
-        if self.autogenerate_migrations is not None:
-            return self.autogenerate_migrations
-        return self.environment.lower() in {"dev", "development"}
+        return bool(self.autogenerate_migrations)
 
     @property
     def project_root(self) -> Path:
@@ -61,16 +59,13 @@ class Settings(BaseSettings):
             "http://192.168.8.102:8080",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "http://192.168.8.102:5173",
         ]
 
     @property
     def allowed_cors_regex(self) -> str | None:
         if self.cors_origin_regex:
             return self.cors_origin_regex
-        if self.environment.lower() in {"dev", "development"}:
-            return r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):(8080|5173)$"
-        return None
+        return r"^http://192\.168\.\d+\.\d+:8080$"
 
 
 @lru_cache(maxsize=1)
