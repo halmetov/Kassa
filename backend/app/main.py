@@ -19,6 +19,7 @@ from app.api import (
     routes_users,
 )
 from app.core.config import get_settings
+from app.core.errors import register_error_handlers
 from app.database.session import SessionLocal
 from app.database.migrations import run_migrations_on_startup
 from app.auth.security import get_password_hash, verify_password
@@ -40,6 +41,17 @@ logging.basicConfig(
 
 app = FastAPI(title="Kassa API", version="1.0.0", redirect_slashes=False)
 app.router.redirect_slashes = False
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_cors_origins,
+    allow_origin_regex=settings.allowed_cors_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+register_error_handlers(app)
 
 
 def is_database_available() -> bool:
@@ -86,15 +98,6 @@ def on_startup() -> None:
                     logger.info("Bootstrap admin password updated from ADMIN_PASSWORD.")
     except SQLAlchemyError:
         logger.exception("Database is not available during startup; skipping admin bootstrap.")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allowed_cors_origins,
-    allow_origin_regex=settings.allowed_cors_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(routes_users.router, prefix="/api/users", tags=["users"])

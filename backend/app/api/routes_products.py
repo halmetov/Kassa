@@ -4,10 +4,11 @@ import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user, require_admin, require_employee
+from app.core.config import get_settings
 from app.database.session import get_db
 from app.models.entities import Branch, Category, Product, Stock
 from app.models.user import User
@@ -46,6 +47,7 @@ async def list_products(
 
 @router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
+    settings = get_settings()
     safe_payload = payload.model_dump(exclude_none=True)
     logger.info("Incoming product payload: %s", safe_payload)
 
@@ -64,14 +66,38 @@ async def create_product(payload: product_schema.ProductCreate, db: Session = De
         db.rollback()
         logger.exception("Business validation error while creating product")
         raise
+    except IntegrityError as exc:
+        db.rollback()
+        logger.error("Integrity error while creating product. payload=%s error=%s", safe_payload, exc)
+        original = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        base_detail = "Integrity error"
+        detail = f"{base_detail}: {original}"
+        if not settings.debug:
+            detail = base_detail + (
+                ": duplicate or constraint violation"
+                if "duplicate" in original.lower() or "unique" in original.lower()
+                else ""
+            )
+        raise HTTPException(status_code=400, detail=detail) from exc
+    except (ProgrammingError, OperationalError) as exc:
+        db.rollback()
+        logger.error("Database schema error while creating product. payload=%s error=%s", safe_payload, exc)
+        original = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        detail = f"Database schema error: {original}"
+        if not settings.debug:
+            detail = "Database schema error: migration mismatch or missing column"
+        raise HTTPException(status_code=500, detail=detail) from exc
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Database error while creating product")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Database error while creating product. payload=%s", safe_payload)
+        original = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        detail = f"Database error: {original}" if settings.debug else "Database error"
+        raise HTTPException(status_code=500, detail=detail) from exc
     except Exception as exc:  # pragma: no cover - defensive path
         db.rollback()
-        logger.exception("Unexpected error while creating product")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Unexpected error while creating product. payload=%s", safe_payload)
+        detail = f"Unexpected error: {exc}" if settings.debug else "Unexpected error"
+        raise HTTPException(status_code=500, detail=detail) from exc
 
 
 
