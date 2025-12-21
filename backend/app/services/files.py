@@ -20,4 +20,4 @@ async def save_upload(file: UploadFile) -> str:
         while content := await file.read(1024 * 1024):
             buffer.write(content)
     await file.close()
-    return str(destination)
+    return filename

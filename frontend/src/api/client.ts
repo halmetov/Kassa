@@ -8,8 +8,7 @@ const jsonHeaders = {
 function normalizeApiPath(path: string): string {
   if (!path) return path;
   const [pathname, query] = path.split("?");
-  const normalizedPath =
-    pathname.endsWith("/") && pathname !== "/" ? pathname.replace(/\/+$/, "") : pathname;
+  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return query ? `${normalizedPath}?${query}` : normalizedPath;
 }
 
@@ -73,7 +72,6 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
   let response: Response;
   try {
     response = await fetch(url, {
-      credentials: "omit",
       ...options,
       headers,
     });
