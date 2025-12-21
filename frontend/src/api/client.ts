@@ -14,24 +14,33 @@ function normalizeApiPath(path: string): string {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      try {
-        const payload = await response.json();
-        const detail = payload?.detail || payload?.message;
-        throw new Error(detail || `API error: ${response.status}`);
-      } catch {
-        // fall back to plain text
-      }
+  const raw = await response.text();
+  let parsed: unknown = null;
+
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = raw;
     }
-    const message = await response.text();
-    throw new Error(message || `API error: ${response.status}`);
   }
+
+  if (!response.ok) {
+    const detail =
+      typeof parsed === "object" && parsed !== null ? (parsed as any).detail || (parsed as any).message : undefined;
+    const message = detail || (typeof parsed === "string" ? parsed : raw) || `API error: ${response.status}`;
+    throw new Error(message);
+  }
+
   if (response.status === 204) {
     return {} as T;
   }
-  return (await response.json()) as T;
+
+  if (!raw) {
+    return {} as T;
+  }
+
+  return parsed as T;
 }
 
 async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
