@@ -87,17 +87,19 @@ export default function Products() {
       return;
     }
 
+    const payload = {
+      name: formData.name.trim(),
+      category_id: formData.category_id ? Number(formData.category_id) : null,
+      unit: formData.unit,
+      barcode: formData.barcode || null,
+      purchase_price: parseFloat(formData.purchase_price) || 0,
+      sale_price: parseFloat(formData.sale_price) || 0,
+      wholesale_price: parseFloat(formData.wholesale_price) || 0,
+      limit: parseInt(formData.limit) || 0,
+    };
+
     try {
-      const product = await apiPost<Product>("/api/products", {
-        name: formData.name.trim(),
-        category_id: formData.category_id ? Number(formData.category_id) : null,
-        unit: formData.unit,
-        barcode: formData.barcode || null,
-        purchase_price: parseFloat(formData.purchase_price) || 0,
-        sale_price: parseFloat(formData.sale_price) || 0,
-        wholesale_price: parseFloat(formData.wholesale_price) || 0,
-        limit: parseInt(formData.limit) || 0,
-      });
+      const product = await apiPost<Product>("/api/products", payload);
 
       if (newPhotoFile) {
         try {
@@ -112,8 +114,12 @@ export default function Products() {
 
       toast.success("Товар добавлен");
     } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "Ошибка добавления товара");
+      console.error("Product creation failed", { error, payload });
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Bad Request: проверь тело запроса";
+      toast.error(message);
       return;
     }
     setFormData({
