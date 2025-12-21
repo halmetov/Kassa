@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import MovementStatus
@@ -35,13 +35,13 @@ class Product(Base, TimestampMixin):
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    unit: Mapped[str] = mapped_column(String(50), default="pcs")
+    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="шт", server_default=text("'шт'"))
     barcode: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
-    purchase_price: Mapped[float] = mapped_column(Float, default=0)
-    sale_price: Mapped[float] = mapped_column(Float, default=0)
-    wholesale_price: Mapped[float] = mapped_column(Float, default=0)
-    limit: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    purchase_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
+    sale_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
+    wholesale_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
+    limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0, server_default=text("0"))
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
 
     category: Mapped[Optional[Category]] = relationship(back_populates="products")
     stocks: Mapped[List[Stock]] = relationship(back_populates="product")

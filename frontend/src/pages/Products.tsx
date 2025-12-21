@@ -115,10 +115,7 @@ export default function Products() {
       toast.success("Товар добавлен");
     } catch (error) {
       console.error("Product creation failed", { error, payload });
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Bad Request: проверь тело запроса";
+      const message = error instanceof Error ? error.message : "Bad Request: проверь тело запроса";
       toast.error(message);
       return;
     }

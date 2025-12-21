@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,6 +11,7 @@ from app.models.entities import Category, Product
 from app.schemas import categories as category_schema
 
 router = APIRouter(redirect_slashes=False)
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[category_schema.Category], dependencies=[Depends(require_employee)])
@@ -51,7 +54,8 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
     try:
         db.delete(category)
         db.commit()
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Не удалось удалить категорию")
+        logger.exception("Database error while deleting category %s", category_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return None
