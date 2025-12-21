@@ -103,7 +103,7 @@ async def upload_photo(
         raise HTTPException(status_code=404, detail="Product not found")
     try:
         photo_name = await save_upload(file)
-        public_url = f\"{str(request.base_url).rstrip('/')}/static/{photo_name}\"
+        public_url = f"{str(request.base_url).rstrip('/')}/static/{photo_name}"
         product.photo = public_url
         product.image_url = public_url
         db.commit()
