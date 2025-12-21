@@ -69,7 +69,7 @@ class Settings(BaseSettings):
         if self.cors_origin_regex:
             return self.cors_origin_regex
         if self.environment.lower() in {"dev", "development"}:
-            return r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):8080$"
+            return r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):(8080|5173)$"
         return None
 
 
