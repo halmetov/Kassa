@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user, require_admin, require_employee
 from app.database.session import get_db
-from app.models.entities import Branch, Product, Stock
+from app.models.entities import Branch, Category, Product, Stock
 from app.models.user import User
 from app.schemas import stock as stock_schema
 from app.schemas import products as product_schema
@@ -46,16 +46,32 @@ async def list_products(
 
 @router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
+    safe_payload = payload.model_dump(exclude_none=True)
+    logger.info("Incoming product payload: %s", safe_payload)
+
+    if payload.category_id is not None:
+        category = db.get(Category, payload.category_id)
+        if category is None:
+            raise HTTPException(status_code=400, detail="Категория не найдена")
+
     try:
-        product = Product(**payload.dict(exclude_unset=True))
+        product = Product(**payload.model_dump())
         db.add(product)
         db.commit()
         db.refresh(product)
         return product
+    except HTTPException:
+        db.rollback()
+        logger.exception("Business validation error while creating product")
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to create product: %s", payload.dict())
-        raise HTTPException(status_code=400, detail="Не удалось создать товар. Проверьте данные.") from exc
+        logger.exception("Database error while creating product")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive path
+        db.rollback()
+        logger.exception("Unexpected error while creating product")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 
@@ -64,16 +80,29 @@ async def update_product(product_id: int, payload: product_schema.ProductUpdate,
     product = db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    updates = payload.model_dump(exclude_unset=True)
+    logger.info("Updating product %s with payload: %s", product_id, updates)
+
+    if "category_id" in updates and updates["category_id"] is not None:
+        category = db.get(Category, updates["category_id"])
+        if category is None:
+            raise HTTPException(status_code=400, detail="Категория не найдена")
+
     try:
-        for field, value in payload.dict(exclude_unset=True).items():
+        for field, value in updates.items():
             setattr(product, field, value)
         db.commit()
         db.refresh(product)
         return product
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to update product %s: %s", product_id, payload.dict(exclude_unset=True))
-        raise HTTPException(status_code=400, detail="Не удалось обновить товар. Проверьте данные.") from exc
+        logger.exception("Database error while updating product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive path
+        db.rollback()
+        logger.exception("Unexpected error while updating product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
@@ -87,8 +116,12 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
         return None
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to delete product %s", product_id)
-        raise HTTPException(status_code=400, detail="Не удалось удалить товар.") from exc
+        logger.exception("Database error while deleting product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive path
+        db.rollback()
+        logger.exception("Unexpected error while deleting product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/{product_id}/photo", response_model=product_schema.Product, dependencies=[Depends(require_admin)])
@@ -102,7 +135,7 @@ async def upload_photo(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     try:
-        photo_name = await save_upload(file)
+        photo_name = await save_upload(file, subdir="products")
         public_url = f"{str(request.base_url).rstrip('/')}/static/{photo_name}"
         product.photo = public_url
         product.image_url = public_url
@@ -111,8 +144,12 @@ async def upload_photo(
         return product
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to upload photo for product %s", product_id)
-        raise HTTPException(status_code=400, detail="Не удалось загрузить фото товара.") from exc
+        logger.exception("Database error while uploading photo for product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive path
+        db.rollback()
+        logger.exception("Unexpected error while uploading photo for product %s", product_id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/low-stock", response_model=list[stock_schema.LowStockItem], dependencies=[Depends(require_employee)])

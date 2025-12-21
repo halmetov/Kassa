@@ -33,18 +33,10 @@ async function handleResponse<T>(response: Response, context: RequestContext): P
 
   if (!response.ok) {
     const detail =
-      typeof parsed === "object" && parsed !== null ? (parsed as any).detail || (parsed as any).message : undefined;
+      parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>).detail || (parsed as Record<string, unknown>).message
+        : undefined;
     const message = detail || (typeof parsed === "string" ? parsed : raw) || `API error: ${response.status}`;
-    const statusLabel = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`.trim();
-    const contextParts = [
-      `url=${context.url}`,
-      `method=${context.method}`,
-      `normalizedPath=${context.normalizedPath}`,
-      `API_URL=${API_URL}`,
-      `origin=${context.origin}`,
-      statusLabel ? `status=${statusLabel}` : null,
-      raw ? `response=${raw}` : null,
-    ].filter(Boolean);
     console.error("API request failed", {
       method: context.method,
       url: context.url,
@@ -52,14 +44,13 @@ async function handleResponse<T>(response: Response, context: RequestContext): P
       statusText: response.statusText,
       response: raw,
     });
-    throw new Error(`${message} | ${contextParts.join(" | ")}`);
+    const error = new Error(String(message));
+    (error as any).status = response.status;
+    (error as any).body = parsed ?? raw;
+    throw error;
   }
 
-  if (response.status === 204) {
-    return {} as T;
-  }
-
-  if (!raw) {
+  if (response.status === 204 || !raw) {
     return {} as T;
   }
 
