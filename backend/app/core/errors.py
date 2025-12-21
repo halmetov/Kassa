@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError, SQLAlchemyError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import get_settings
 
@@ -38,7 +39,6 @@ def _log_exception(exc: BaseException) -> str:
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError):  # type: ignore[override]
         trace = _log_exception(exc)
         payload = _build_base_payload(
@@ -49,7 +49,6 @@ def register_error_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(status_code=400, content=payload)
 
-    @app.exception_handler((ProgrammingError, OperationalError))
     async def db_schema_error_handler(request: Request, exc: SQLAlchemyError):  # type: ignore[override]
         trace = _log_exception(exc)
         detail_message = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
@@ -62,7 +61,6 @@ def register_error_handlers(app: FastAPI) -> None:
         status_code = 500
         return JSONResponse(status_code=status_code, content=payload)
 
-    @app.exception_handler(SQLAlchemyError)
     async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):  # type: ignore[override]
         trace = _log_exception(exc)
         detail_message = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
@@ -74,8 +72,7 @@ def register_error_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(status_code=500, content=payload)
 
-    @app.exception_handler((ValidationError, RequestValidationError))
-    async def validation_error_handler(request: Request, exc: ValidationError):  # type: ignore[override]
+    async def validation_error_handler(request: Request, exc: ValidationError | RequestValidationError):  # type: ignore[override]
         trace = _log_exception(exc)
         error_details = exc.errors()
         if error_details:
@@ -96,7 +93,17 @@ def register_error_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(status_code=422, content=payload)
 
-    @app.exception_handler(Exception)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):  # type: ignore[override]
+        trace = _log_exception(exc)
+        detail_message = exc.detail if exc.detail else exc.__class__.__name__
+        payload = _build_base_payload(
+            request,
+            error_type="HTTPException",
+            detail=str(detail_message),
+            trace=trace,
+        )
+        return JSONResponse(status_code=exc.status_code, content=payload)
+
     async def unhandled_error_handler(request: Request, exc: Exception):  # type: ignore[override]
         trace = _log_exception(exc)
         payload = _build_base_payload(
@@ -106,3 +113,12 @@ def register_error_handlers(app: FastAPI) -> None:
             trace=trace,
         )
         return JSONResponse(status_code=500, content=payload)
+
+    app.add_exception_handler(IntegrityError, integrity_error_handler)
+    for error_cls in (ProgrammingError, OperationalError):
+        app.add_exception_handler(error_cls, db_schema_error_handler)
+    app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
+    for error_cls in (ValidationError, RequestValidationError):
+        app.add_exception_handler(error_cls, validation_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(Exception, unhandled_error_handler)
