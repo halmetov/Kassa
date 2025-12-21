@@ -113,7 +113,7 @@ export default function Products() {
       toast.success("Товар добавлен");
     } catch (error) {
       console.error(error);
-      toast.error("Ошибка добавления товара");
+      toast.error(error instanceof Error ? error.message : "Ошибка добавления товара");
       return;
     }
     setFormData({

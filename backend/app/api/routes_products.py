@@ -21,7 +21,6 @@ router = APIRouter(redirect_slashes=False)
 
 
 @router.get("", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
-@router.get("/", response_model=list[product_schema.Product], dependencies=[Depends(require_employee)])
 async def list_products(
     branch_id: int | None = None,
     db: Session = Depends(get_db),
@@ -46,7 +45,6 @@ async def list_products(
 
 
 @router.post("", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
-@router.post("/", response_model=product_schema.Product, dependencies=[Depends(require_employee)])
 async def create_product(payload: product_schema.ProductCreate, db: Session = Depends(get_db)):
     try:
         product = Product(**payload.dict(exclude_unset=True))

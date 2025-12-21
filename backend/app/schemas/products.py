@@ -13,8 +13,8 @@ class ProductBase(BaseModel):
     sale_price: float = 0
     wholesale_price: float = 0
     limit: int = 0
-    image_url: Optional[str] = None
-    photo: Optional[str] = None
+    image_url: str | None = None
+    photo: str | None = None
 
 
 class ProductCreate(ProductBase):
