@@ -45,6 +45,13 @@ async function handleResponse<T>(response: Response, context: RequestContext): P
       statusLabel ? `status=${statusLabel}` : null,
       raw ? `response=${raw}` : null,
     ].filter(Boolean);
+    console.error("API request failed", {
+      method: context.method,
+      url: context.url,
+      status: response.status,
+      statusText: response.statusText,
+      response: raw,
+    });
     throw new Error(`${message} | ${contextParts.join(" | ")}`);
   }
 
@@ -74,6 +81,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     response = await fetch(url, {
       ...options,
       headers,
+      credentials: "omit",
     });
   } catch (error) {
     const errorMessageParts = [
