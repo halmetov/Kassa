@@ -32,10 +32,15 @@ async function handleResponse<T>(response: Response, context: RequestContext): P
   }
 
   if (!response.ok) {
-    const detail =
-      parsed && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>).detail || (parsed as Record<string, unknown>).message
-        : undefined;
+    let detail: unknown;
+    if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed)) {
+        const first = parsed[0] as any;
+        detail = first?.detail || first?.message || first?.msg;
+      } else {
+        detail = (parsed as Record<string, unknown>).detail || (parsed as Record<string, unknown>).message;
+      }
+    }
     const message = detail || (typeof parsed === "string" ? parsed : raw) || `API error: ${response.status}`;
     console.error("API request failed", {
       method: context.method,
@@ -43,6 +48,7 @@ async function handleResponse<T>(response: Response, context: RequestContext): P
       status: response.status,
       statusText: response.statusText,
       response: raw,
+      body: parsed,
     });
     const error = new Error(String(message));
     (error as any).status = response.status;
@@ -75,6 +81,14 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       credentials: "omit",
     });
   } catch (error) {
+    console.error("Network/transport error while calling API", {
+      method,
+      url,
+      normalizedPath,
+      apiUrl: API_URL,
+      origin,
+      error,
+    });
     const errorMessageParts = [
       "Failed to fetch",
       `method=${method}`,

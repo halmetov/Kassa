@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://postgres:123@localhost:5432/kassa_db"
+    debug: bool = Field(default=False, env="DEBUG")
 
     jwt_secret_key: str = "kassa_project"
     jwt_algorithm: str = "HS256"
