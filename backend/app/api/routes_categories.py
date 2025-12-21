@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.security import require_admin, require_employee
 from app.database.session import get_db
-from app.models.entities import Category
+from app.models.entities import Category, Product
 from app.schemas import categories as category_schema
 
 router = APIRouter(redirect_slashes=False)
@@ -41,6 +42,16 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
     category = db.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
-    db.delete(category)
-    db.commit()
+    products_count = db.scalar(
+        select(func.count()).select_from(Product).where(Product.category_id == category_id)
+    )
+    if products_count:
+        raise HTTPException(status_code=400, detail="Категория используется товарами")
+
+    try:
+        db.delete(category)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Не удалось удалить категорию")
     return None

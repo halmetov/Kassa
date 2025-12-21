@@ -27,7 +27,10 @@ logger = logging.getLogger(__name__)
 async def _extract_credentials(request: Request) -> tuple[str | None, str | None]:
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("application/json"):
-        payload = await request.json()
+        try:
+            payload = await request.json()
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Неверный JSON")
         return payload.get("login"), payload.get("password")
 
     form = await request.form()
@@ -63,10 +66,10 @@ async def login(request: Request, db: Session = Depends(get_db)):
         raise
     except SQLAlchemyError as exc:
         logger.exception("Database error during login for user %s", login_value)
-        raise HTTPException(status_code=500, detail="Internal server error") from exc
+        raise HTTPException(status_code=500, detail="Ошибка базы данных при входе") from exc
     except Exception as exc:  # pragma: no cover - defensive logging for unexpected errors
         logger.exception("Unexpected error during login for user %s", login_value)
-        raise HTTPException(status_code=500, detail="Internal server error") from exc
+        raise HTTPException(status_code=500, detail="Ошибка аутентификации") from exc
 
 
 @router.get("/me", response_model=auth_schema.AuthUser)
@@ -93,7 +96,7 @@ async def refresh_token(payload: auth_schema.RefreshRequest, db: Session = Depen
         user = db.get(User, user_id)
     except SQLAlchemyError as exc:
         logger.exception("Database error during token refresh for user %s", user_id)
-        raise HTTPException(status_code=500, detail="Internal server error") from exc
+        raise HTTPException(status_code=500, detail="Ошибка базы данных при обновлении токена") from exc
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     role_value = get_role_value(user.role)
