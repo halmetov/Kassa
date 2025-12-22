@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Configure root logger for better debugging (useful for login errors, etc.)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if settings.debug else logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stdout,
 )

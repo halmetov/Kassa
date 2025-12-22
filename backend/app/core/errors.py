@@ -39,6 +39,12 @@ def _log_exception(exc: BaseException) -> str:
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    def _safe_add_exception_handler(exc_cls: type[BaseException], handler):
+        if not isinstance(exc_cls, type):
+            logger.error("Skipping handler registration: %r is not a class", exc_cls)
+            return
+        app.add_exception_handler(exc_cls, handler)
+
     async def integrity_error_handler(request: Request, exc: IntegrityError):  # type: ignore[override]
         trace = _log_exception(exc)
         payload = _build_base_payload(
@@ -114,11 +120,11 @@ def register_error_handlers(app: FastAPI) -> None:
         )
         return JSONResponse(status_code=500, content=payload)
 
-    app.add_exception_handler(IntegrityError, integrity_error_handler)
+    _safe_add_exception_handler(IntegrityError, integrity_error_handler)
     for error_cls in (ProgrammingError, OperationalError):
-        app.add_exception_handler(error_cls, db_schema_error_handler)
-    app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
+        _safe_add_exception_handler(error_cls, db_schema_error_handler)
+    _safe_add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
     for error_cls in (ValidationError, RequestValidationError):
-        app.add_exception_handler(error_cls, validation_error_handler)
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
-    app.add_exception_handler(Exception, unhandled_error_handler)
+        _safe_add_exception_handler(error_cls, validation_error_handler)
+    _safe_add_exception_handler(StarletteHTTPException, http_exception_handler)
+    _safe_add_exception_handler(Exception, unhandled_error_handler)

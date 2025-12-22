@@ -16,7 +16,6 @@ class User(Base):
         Enum(
             UserRole,
             name="user_roles",
-            create_type=False,
             values_callable=lambda enum_cls: [e.value for e in enum_cls],
         ),
         nullable=False,

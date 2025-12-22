@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 
@@ -13,7 +13,12 @@ def create_sync_engine(url: str) -> Engine:
         connect_args["check_same_thread"] = False
     elif url.startswith("postgresql"):
         connect_args["connect_timeout"] = 5
-    return create_engine(url, echo=False, future=True, connect_args=connect_args)
+    return create_engine(
+        url,
+        echo=bool(settings.debug),
+        future=True,
+        connect_args=connect_args,
+    )
 
 
 engine = create_sync_engine(settings.database_url)

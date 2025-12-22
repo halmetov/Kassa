@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://postgres:123@localhost:5432/kassa_db"
-    debug: bool = Field(default=False, env="DEBUG")
+    debug: bool = Field(default=True, env="DEBUG")
 
     jwt_secret_key: str = "kassa_project"
     jwt_algorithm: str = "HS256"
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     cors_origin_regex: str | None = Field(default=None, env="CORS_ORIGIN_REGEX")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -57,7 +57,6 @@ class Settings(BaseSettings):
         return [
             "http://localhost:8080",
             "http://127.0.0.1:8080",
-            "http://192.168.8.102:8080",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
         ]

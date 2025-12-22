@@ -57,7 +57,7 @@ async def create_product(payload: product_schema.ProductCreate, db: Session = De
             raise HTTPException(status_code=400, detail="Категория не найдена")
 
     try:
-        product = Product(**payload.model_dump())
+        product = Product(**safe_payload)
         db.add(product)
         db.commit()
         db.refresh(product)
@@ -161,6 +161,11 @@ async def upload_photo(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     try:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Файл не передан")
+        if file.content_type is None or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Разрешена только загрузка изображений")
+
         photo_name = await save_upload(file, subdir="products")
         public_url = f"{str(request.base_url).rstrip('/')}/static/{photo_name}"
         product.photo = public_url
