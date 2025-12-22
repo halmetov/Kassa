@@ -1,18 +1,23 @@
 from __future__ import with_statement
 
-import os
-import sys
 from logging.config import fileConfig
+from pathlib import Path
+import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import Connection
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+BASE_DIR = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = BASE_DIR.parent
+for path in (BASE_DIR, PROJECT_ROOT):
+    path_str = str(path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
 
 from app.core.config import get_settings
 from app.database.base import Base
-from app import models  # noqa: F401 - ensure models are imported for metadata
+import app.models  # noqa: F401 - ensure models are imported for metadata
 
 config = context.config
 settings = get_settings()
@@ -25,7 +30,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = settings.database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,

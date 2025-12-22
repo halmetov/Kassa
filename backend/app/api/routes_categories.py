@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -45,13 +45,11 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
     category = db.get(Category, category_id)
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
-    products_count = db.scalar(
-        select(func.count()).select_from(Product).where(Product.category_id == category_id)
-    )
-    if products_count:
-        raise HTTPException(status_code=400, detail="Категория используется товарами")
 
     try:
+        products = db.execute(select(Product).where(Product.category_id == category_id)).scalars().all()
+        for product in products:
+            product.category_id = None
         db.delete(category)
         db.commit()
     except SQLAlchemyError as exc:
