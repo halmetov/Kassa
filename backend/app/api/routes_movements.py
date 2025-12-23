@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.security import get_current_user, require_employee
 from app.core.enums import MovementStatus
@@ -32,7 +32,7 @@ def _validate_branch_access(branch_id: int, current_user: User) -> None:
     if current_user.role == "admin":
         return
     if current_user.branch_id is None:
-        raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        raise HTTPException(status_code=403, detail="Сотрудник не привязан к филиалу")
     if current_user.branch_id != branch_id:
         raise HTTPException(status_code=403, detail="Нет доступа к указанному филиалу")
 
@@ -43,7 +43,7 @@ def _ensure_movement_access(movement: Movement | None, current_user: User) -> Mo
     if current_user.role == "admin":
         return movement
     if current_user.branch_id is None:
-        raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        raise HTTPException(status_code=403, detail="Сотрудник не привязан к филиалу")
     if movement.from_branch_id != current_user.branch_id and movement.to_branch_id != current_user.branch_id:
         raise HTTPException(status_code=403, detail="Нет доступа к перемещению")
     return movement
@@ -69,7 +69,7 @@ def _apply_filters(
         query = query.where(Movement.created_at <= _date_bounds(end_date, False))
     if current_user.role == "employee":
         if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+            raise HTTPException(status_code=403, detail="Сотрудник не привязан к филиалу")
         query = query.where(
             (Movement.from_branch_id == current_user.branch_id)
             | (Movement.to_branch_id == current_user.branch_id)
@@ -95,7 +95,7 @@ async def list_movements(
         joinedload(Movement.to_branch),
         joinedload(Movement.processed_by),
         joinedload(Movement.created_by),
-        joinedload(Movement.items).joinedload(MovementItemModel.product),
+        selectinload(Movement.items).selectinload(MovementItemModel.product),
     )
     query = _apply_filters(query, current_user, branch_id, status, date_from, date_to)
 
@@ -208,7 +208,7 @@ async def accept_movement(
     movement = db.execute(
         select(Movement)
         .where(Movement.id == movement_id)
-        .options(joinedload(Movement.items).joinedload(MovementItemModel.product))
+        .options(selectinload(Movement.items).selectinload(MovementItemModel.product))
     ).scalar_one_or_none()
     movement = _ensure_movement_access(movement, current_user)
 
@@ -254,7 +254,7 @@ async def reject_movement(
     movement = db.execute(
         select(Movement)
         .where(Movement.id == movement_id)
-        .options(joinedload(Movement.items).joinedload(MovementItemModel.product))
+        .options(selectinload(Movement.items).selectinload(MovementItemModel.product))
     ).scalar_one_or_none()
     movement = _ensure_movement_access(movement, current_user)
 
@@ -288,7 +288,7 @@ async def get_movement_detail(
             joinedload(Movement.to_branch),
             joinedload(Movement.created_by),
             joinedload(Movement.processed_by),
-            joinedload(Movement.items).joinedload(MovementItemModel.product),
+            selectinload(Movement.items).selectinload(MovementItemModel.product),
         )
     ).scalar_one_or_none()
     movement = _ensure_movement_access(movement, current_user)

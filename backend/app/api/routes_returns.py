@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.security import get_current_user
 from app.database.session import get_db
@@ -36,7 +36,7 @@ def _get_sale_for_return(db: Session, sale_id: int, current_user: User) -> Sale:
     sale = db.execute(
         select(Sale)
         .where(Sale.id == sale_id)
-        .options(joinedload(Sale.items))
+        .options(selectinload(Sale.items))
     ).scalar_one_or_none()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
@@ -180,10 +180,12 @@ async def get_return_detail(
         .options(
             joinedload(Return.branch),
             joinedload(Return.created_by),
-            joinedload(Return.items).joinedload(ReturnItem.sale_item).joinedload(SaleItem.product),
+            selectinload(Return.items)
+            .selectinload(ReturnItem.sale_item)
+            .selectinload(SaleItem.product),
             joinedload(Return.sale),
         )
-    ).scalar_one_or_none()
+    ).scalars().unique().one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Возврат не найден")
     if current_user.role == "employee" and current_user.branch_id != entry.branch_id:
