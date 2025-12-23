@@ -24,6 +24,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env  # настройте DATABASE_URL и JWT_SECRET_KEY
 alembic upgrade head
+python -m app.bootstrap  # применит миграции и создаст admin + филиалы
 uvicorn app.main:app --reload
 ```
 
@@ -49,6 +50,25 @@ npm run dev
 ```
 
 Vite поднимет SPA на `http://localhost:5173`. В `.env` приложения можно указать `VITE_API_URL` (по умолчанию `http://localhost:8000`).
+
+### Запуск на Windows
+
+```powershell
+# Backend
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+$env:DATABASE_URL="postgresql+psycopg2://postgres:123@localhost:5432/kassa_db"  # пример
+alembic upgrade head
+python -m app.bootstrap
+python main.py  # или uvicorn app.main:app --reload
+
+# Frontend
+cd ..\frontend
+npm install
+npm run dev  # или npm run build
+```
 
 ## Дополнительно
 

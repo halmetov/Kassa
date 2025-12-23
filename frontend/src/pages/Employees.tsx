@@ -66,9 +66,9 @@ export default function Employees() {
     try {
       const data = await apiGet<Employee[]>("/api/users");
       setEmployees(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка загрузки сотрудников");
+      toast.error(error?.message || "Ошибка загрузки сотрудников");
     }
   };
 
@@ -76,9 +76,9 @@ export default function Employees() {
     try {
       const data = await apiGet<Branch[]>("/api/branches");
       setBranches(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Не удалось загрузить список филиалов");
+      toast.error(error?.message || "Не удалось загрузить список филиалов");
     }
   };
 
@@ -99,9 +99,9 @@ export default function Employees() {
       toast.success("Сотрудник добавлен");
       setFormData({ name: "", login: "", password: "", role: "employee", active: true, branch_id: null });
       fetchEmployees();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка добавления сотрудника");
+      toast.error(error?.message || "Ошибка добавления сотрудника");
     }
   };
 
@@ -128,9 +128,9 @@ export default function Employees() {
       toast.success("Сотрудник обновлен");
       setEditingId(null);
       fetchEmployees();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка обновления");
+      toast.error(error?.message || "Ошибка обновления");
     }
   };
 
@@ -139,9 +139,9 @@ export default function Employees() {
       await apiDelete(`/api/users/${id}`);
       toast.success("Сотрудник удален");
       fetchEmployees();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка удаления");
+      toast.error(error?.message || "Ошибка удаления");
     }
   };
 
