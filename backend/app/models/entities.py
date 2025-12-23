@@ -165,6 +165,7 @@ class Client(Base, TimestampMixin):
 
     debts: Mapped[List[Debt]] = relationship(back_populates="client")
     sales: Mapped[List[Sale]] = relationship(back_populates="client")
+    debt_payments: Mapped[List["DebtPayment"]] = relationship(back_populates="client")
 
 
 class Sale(Base, TimestampMixin):
@@ -247,6 +248,21 @@ class ReturnItem(Base):
 
     return_entry: Mapped[Return] = relationship(back_populates="items")
     sale_item: Mapped[SaleItem] = relationship()
+
+
+class DebtPayment(Base, TimestampMixin):
+    __tablename__ = "debt_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"))
+    payment_type: Mapped[str] = mapped_column(String(50), default="cash")
+    processed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+
+    client: Mapped[Client] = relationship(back_populates="debt_payments")
+    processed_by: Mapped[Optional["User"]] = relationship("User", back_populates="debt_payments")
+    branch: Mapped[Optional[Branch]] = relationship("Branch")
 
 
 class Log(Base):

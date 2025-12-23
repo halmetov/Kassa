@@ -115,7 +115,14 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
       <SidebarContent>
         <div className="p-4 border-b">
           {open && (
-            <h2 className="text-lg font-bold text-sidebar-foreground">POS Система</h2>
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold text-sidebar-foreground">POS Система</h2>
+              {user && (
+                <div className="text-sm text-sidebar-foreground/80">
+                  {user.name} • {user.role === "admin" ? "Администратор" : "Сотрудник"}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

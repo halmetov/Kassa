@@ -61,6 +61,12 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    debt_payments = relationship(
+        "DebtPayment",
+        back_populates="processed_by",
+        cascade="all, delete-orphan",
+    )
+
     logs = relationship(
         "Log",
         back_populates="created_by",

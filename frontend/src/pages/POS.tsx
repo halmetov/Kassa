@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Search, ShoppingCart, Trash2, Plus, Minus } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, HandCoins } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +43,7 @@ interface Client {
   id: number;
   name: string;
   phone?: string | null;
+  total_debt: number;
 }
 
 type CartItem = {
@@ -64,6 +65,7 @@ export default function POS() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [cashAmount, setCashAmount] = useState("");
   const [cardAmount, setCardAmount] = useState("");
   const [creditAmount, setCreditAmount] = useState("");
@@ -71,6 +73,10 @@ export default function POS() {
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [debtClientId, setDebtClientId] = useState("");
+  const [debtAmount, setDebtAmount] = useState("");
+  const [debtPaymentType, setDebtPaymentType] = useState<"cash" | "card">("cash");
 
   useEffect(() => {
     const loadUser = async () => {
@@ -94,19 +100,39 @@ export default function POS() {
     }
   }, [user]);
 
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const productsData = await apiGet<Product[]>(`/api/cashier/products`);
-        setProducts(productsData);
-      } catch (error: any) {
-        console.error(error);
-        toast.error(error?.message || "Не удалось загрузить товары");
-      }
-    };
-
-    loadProducts();
+  const syncCartWithStock = useCallback((nextProducts: Product[]) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const matched = nextProducts.find((p) => p.id === item.product_id);
+        const available_qty = matched?.available_qty ?? item.available_qty;
+        const safeQty = Math.min(item.quantity, available_qty);
+        return {
+          ...item,
+          available_qty,
+          quantity: safeQty,
+          total: safeQty * item.price,
+        };
+      }),
+    );
   }, []);
+
+  const loadProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    try {
+      const productsData = await apiGet<Product[]>(`/api/cashier/products`);
+      setProducts(productsData);
+      syncCartWithStock(productsData);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message || "Не удалось загрузить товары");
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, [syncCartWithStock]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     filterProducts();
@@ -209,6 +235,7 @@ export default function POS() {
   };
 
   const getTotalAmount = () => cart.reduce((sum, item) => sum + item.total, 0);
+  const hasInsufficient = useMemo(() => cart.some((item) => item.quantity > item.available_qty), [cart]);
 
   const handlePayment = async () => {
     if (!user) {
@@ -267,6 +294,7 @@ export default function POS() {
       setCardAmount("");
       setCreditAmount("");
       setSelectedClient("");
+      loadProducts();
     } catch (error) {
       console.error(error);
       toast.error((error as any)?.message || "Ошибка при оформлении продажи");
@@ -302,6 +330,39 @@ export default function POS() {
     }
   };
 
+  const handleDebtPayment = async () => {
+    if (!debtClientId) {
+      toast.error("Выберите клиента");
+      return;
+    }
+    const amountValue = parseFloat(debtAmount);
+    if (!amountValue || amountValue <= 0) {
+      toast.error("Введите сумму погашения");
+      return;
+    }
+    try {
+      await apiPost("/api/debts/pay", {
+        client_id: Number(debtClientId),
+        amount: amountValue,
+        payment_type: debtPaymentType === "cash" ? "cash" : "card",
+      });
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === Number(debtClientId)
+            ? { ...c, total_debt: Math.max(0, c.total_debt - amountValue) }
+            : c,
+        ),
+      );
+      toast.success("Долг погашен");
+      setShowDebtModal(false);
+      setDebtAmount("");
+      setDebtClientId("");
+    } catch (error) {
+      console.error(error);
+      toast.error((error as any)?.message || "Не удалось погасить долг");
+    }
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row gap-4">
       <div className="flex-1 space-y-4">
@@ -325,15 +386,15 @@ export default function POS() {
             Все
           </Button>
           {categories.map((category) => (
-          <Button
-            key={category.id}
-            variant={selectedCategory === category.name ? "default" : "outline"}
-            onClick={() => setSelectedCategory(category.name)}
-          >
-            {category.name}
-          </Button>
-        ))}
-      </div>
+            <Button
+              key={category.id}
+              variant={selectedCategory === category.name ? "default" : "outline"}
+              onClick={() => setSelectedCategory(category.name)}
+            >
+              {category.name}
+            </Button>
+          ))}
+        </div>
 
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filteredProducts.map((product) => (
@@ -359,6 +420,7 @@ export default function POS() {
               {product.barcode && (
                 <div className="text-xs text-muted-foreground mt-1">Штрихкод: {product.barcode}</div>
               )}
+              {isLoadingProducts && <div className="text-xs text-muted-foreground mt-1">Обновление...</div>}
             </Card>
           ))}
         </div>
@@ -368,6 +430,9 @@ export default function POS() {
         <div className="flex items-center gap-2 mb-4">
           <ShoppingCart className="h-5 w-5" />
           <h2 className="text-xl font-bold">Корзина</h2>
+          <Button variant="ghost" size="icon" className="ml-auto" onClick={() => setShowDebtModal(true)}>
+            <HandCoins className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex-1 space-y-2 overflow-auto mb-4">
@@ -418,6 +483,9 @@ export default function POS() {
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground">Доступно: {item.available_qty}</div>
+                {item.quantity > item.available_qty && (
+                  <div className="text-xs text-destructive font-medium">Не хватает на складе магазина</div>
+                )}
 
                 <div className="flex gap-2">
                   <Input
@@ -439,12 +507,15 @@ export default function POS() {
             <span>Итого:</span>
             <span>{getTotalAmount().toFixed(2)} ₸</span>
           </div>
+          {hasInsufficient && (
+            <div className="text-sm text-destructive">Количество превышает остаток. Обновите позиции.</div>
+          )}
 
           <Button
             className="w-full"
             size="lg"
             onClick={() => setShowPaymentModal(true)}
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || hasInsufficient}
           >
             Оплата
           </Button>
@@ -533,7 +604,9 @@ export default function POS() {
             <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
               Отмена
             </Button>
-            <Button onClick={handlePayment}>Подтвердить</Button>
+            <Button onClick={handlePayment} disabled={hasInsufficient}>
+              Подтвердить
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -562,6 +635,67 @@ export default function POS() {
               Отмена
             </Button>
             <Button onClick={handleCreateClient}>Сохранить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDebtModal} onOpenChange={setShowDebtModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Погашение долга</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Клиент *</Label>
+              <Select
+                value={debtClientId}
+                onValueChange={(val) => {
+                  setDebtClientId(val);
+                  const client = clients.find((c) => c.id === Number(val));
+                  if (client) {
+                    setDebtAmount(String(client.total_debt || ""));
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите клиента" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={String(client.id)}>
+                      {client.name} • долг {client.total_debt.toFixed(2)} ₸
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Сумма</Label>
+              <Input
+                type="number"
+                value={debtAmount}
+                onChange={(e) => setDebtAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label>Способ оплаты</Label>
+              <Select value={debtPaymentType} onValueChange={(val) => setDebtPaymentType(val as "cash" | "card")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Наличные</SelectItem>
+                  <SelectItem value="card">Карта</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDebtModal(false)}>
+              Отмена
+            </Button>
+            <Button onClick={handleDebtPayment}>Погасить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

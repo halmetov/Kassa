@@ -136,7 +136,12 @@ async def list_returns(
 ):
     query = (
         select(Return)
-        .options(joinedload(Return.branch), joinedload(Return.created_by))
+        .options(
+            joinedload(Return.branch),
+            joinedload(Return.created_by),
+            joinedload(Return.sale).joinedload(Sale.client),
+            selectinload(Return.items),
+        )
         .order_by(Return.created_at.desc())
     )
     query = _enforce_scope(query, current_user)
@@ -160,6 +165,7 @@ async def list_returns(
                 branch_name=entry.branch.name if entry.branch else None,
                 created_by_id=entry.created_by_id,
                 created_by_name=entry.created_by.name if entry.created_by else None,
+                client_name=entry.sale.client.name if entry.sale and entry.sale.client else None,
                 type=entry.type,
                 total_amount=total_amount,
                 created_at=entry.created_at,
@@ -213,6 +219,7 @@ async def get_return_detail(
         branch_name=entry.branch.name if entry.branch else None,
         created_by_id=entry.created_by_id,
         created_by_name=entry.created_by.name if entry.created_by else None,
+        client_name=entry.sale.client.name if entry.sale and entry.sale.client else None,
         type=entry.type,
         reason=entry.reason,
         total_amount=total_amount,
