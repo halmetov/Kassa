@@ -26,6 +26,8 @@ export const Layout = () => {
     "/products",
     "/movements",
     "/clients",
+    "/employees",
+    "/branches",
   ];
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
@@ -75,6 +77,8 @@ export const Layout = () => {
     setIsSidebarOpen(false);
   }, [location.pathname]);
 
+  const isAdmin = user?.role === "admin";
+
   useEffect(() => {
     const loadLowStock = async () => {
       try {
@@ -123,7 +127,7 @@ export const Layout = () => {
             </Button>
           </header>
           <div className="flex-1 p-4 lg:p-6">
-            <Outlet />
+            <Outlet context={{ user, isAdmin }} />
           </div>
         </main>
       </div>

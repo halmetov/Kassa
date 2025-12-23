@@ -50,8 +50,8 @@ const menuItems = [
 const systemItems = [
   { title: "Категории", url: "/categories", icon: Tags, adminOnly: false },
   { title: "Товары", url: "/products", icon: Package, adminOnly: false },
-  { title: "Сотрудники", url: "/employees", icon: Users, adminOnly: true },
-  { title: "Филиалы", url: "/branches", icon: Building2, adminOnly: true },
+  { title: "Сотрудники", url: "/employees", icon: Users, adminOnly: false },
+  { title: "Филиалы", url: "/branches", icon: Building2, adminOnly: false },
   { title: "Клиенты", url: "/clients", icon: UserCircle, adminOnly: false },
 ];
 
@@ -74,7 +74,18 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
   const isAdmin = user?.role === 'admin' || isLoadingUser;
   const isEmployee = user?.role === 'employee';
 
-  const allowedForEmployee = ["/pos", "/warehouse", "/income", "/returns", "/categories", "/products", "/movements"];
+  const allowedForEmployee = [
+    "/pos",
+    "/warehouse",
+    "/income",
+    "/returns",
+    "/categories",
+    "/products",
+    "/movements",
+    "/clients",
+    "/employees",
+    "/branches",
+  ];
   const visibleMenuItems = user
     ? menuItems.filter((item) => {
         if (item.adminOnly && user.role !== "admin") return false;
@@ -177,7 +188,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
                     .filter((item) => {
                       if (item.adminOnly && !isAdmin) return false;
                       if (isEmployee) {
-                        return ["/categories", "/products", "/clients"].includes(item.url);
+                        return ["/categories", "/products", "/clients", "/employees", "/branches"].includes(item.url);
                       }
                       return true;
                     })
