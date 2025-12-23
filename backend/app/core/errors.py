@@ -51,13 +51,13 @@ def register_error_handlers(app: FastAPI) -> None:
         app.add_exception_handler(exc_cls, handler)
 
     async def integrity_error_handler(request: Request, exc: IntegrityError):  # type: ignore[override]
-        _log_exception(exc)
+        trace = _log_exception(exc)
         payload = _build_base_payload(
             request,
             error_type=exc.__class__.__name__,
             error_code="integrity_error",
             detail=f"Integrity error: {exc.orig}",
-            trace=_log_exception(exc),
+            trace=trace,
         )
         return JSONResponse(status_code=400, content=payload)
 

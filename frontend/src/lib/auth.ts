@@ -37,6 +37,7 @@ export async function login(login: string, password: string) {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
+    credentials: "include",
     body: new URLSearchParams({ username: login, password }).toString(),
   });
   if (!response.ok) {
@@ -62,6 +63,7 @@ export async function refreshAccessToken() {
     headers: {
       "Content-Type": "application/json",
     },
+    credentials: "include",
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
   if (!response.ok) {
@@ -80,6 +82,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
   });
   if (response.status === 401) {
     const refreshed = await refreshAccessToken();

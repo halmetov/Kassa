@@ -88,7 +88,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     response = await fetch(url, {
       ...options,
       headers,
-      credentials: "omit",
+      credentials: "include",
     });
   } catch (error) {
     console.error("Network/transport error while calling API", {

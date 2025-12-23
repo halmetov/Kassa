@@ -98,8 +98,12 @@ class Movement(Base, TimestampMixin):
     to_branch: Mapped[Branch] = relationship(
         "Branch", foreign_keys=[to_branch_id], back_populates="incoming_movements"
     )
-    created_by: Mapped[Optional["User"]] = relationship("User", back_populates="movements_created")
-    processed_by: Mapped[Optional["User"]] = relationship("User")
+    created_by: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="movements_created", foreign_keys=[created_by_id]
+    )
+    processed_by: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[processed_by_id], back_populates="processed_movements"
+    )
     items: Mapped[List["MovementItem"]] = relationship(
         "MovementItem", back_populates="movement", cascade="all, delete-orphan"
     )
