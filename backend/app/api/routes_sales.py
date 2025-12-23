@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.security import get_current_user
 from app.core.config import get_settings
@@ -105,74 +105,79 @@ async def create_sale(
         raise HTTPException(status_code=400, detail="Позиции продажи не указаны")
 
     total = Decimal("0")
-    sale = Sale(
-        branch_id=branch_id,
-        seller_id=seller_id,
-        client_id=payload.client_id,
-        paid_cash=payload.paid_cash,
-        paid_card=payload.paid_card,
-        paid_debt=payload.paid_debt,
-        payment_type=payload.payment_type,
-        total_amount=Decimal("0"),
-    )
-    db.add(sale)
-    db.flush()
-
-    for item in payload.items:
-        product = db.get(Product, item.product_id)
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-        stock = db.execute(
-            select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == item.product_id)
-        ).scalar_one_or_none()
-        available_qty = stock.quantity if stock else 0
-        if available_qty < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Недостаточно товара '{product.name}'. Доступно: {available_qty}, запрошено: {item.quantity}",
-            )
-
-        price = Decimal(str(item.price))
-        discount = Decimal(str(item.discount))
-        quantity = Decimal(item.quantity)
-        line_total = (price - discount) * quantity
-        adjust_stock(db, branch_id, item.product_id, -item.quantity)
-        product.quantity = max(product.quantity - item.quantity, 0)
-
-        sale_item = SaleItem(
-            sale_id=sale.id,
-            product_id=item.product_id,
-            quantity=item.quantity,
-            price=item.price,
-            discount=item.discount,
-            total=float(line_total),
+    try:
+        sale = Sale(
+            branch_id=branch_id,
+            seller_id=seller_id,
+            client_id=payload.client_id,
+            paid_cash=payload.paid_cash,
+            paid_card=payload.paid_card,
+            paid_debt=payload.paid_debt,
+            payment_type=payload.payment_type,
+            total_amount=Decimal("0"),
         )
-        db.add(sale_item)
-        total += line_total
+        db.add(sale)
+        db.flush()
 
-    paid_total = (
-        Decimal(str(payload.paid_cash))
-        + Decimal(str(payload.paid_card))
-        + Decimal(str(payload.paid_debt))
-    )
-    total = total.quantize(Decimal("0.01"))
-    paid_total = paid_total.quantize(Decimal("0.01"))
-    if paid_total != total:
-        raise HTTPException(status_code=400, detail="Сумма оплаты не совпадает с итогом")
+        for item in payload.items:
+            product = db.get(Product, item.product_id)
+            if not product:
+                raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+            stock = db.execute(
+                select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == item.product_id)
+            ).scalar_one_or_none()
+            available_qty = stock.quantity if stock else 0
+            if available_qty < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Недостаточно товара '{product.name}'. Доступно: {available_qty}, запрошено: {item.quantity}",
+                )
 
-    sale.total_amount = total
+            price = Decimal(str(item.price))
+            discount = Decimal(str(item.discount))
+            quantity = Decimal(item.quantity)
+            line_total = (price - discount) * quantity
+            adjust_stock(db, branch_id, item.product_id, -item.quantity)
+            product.quantity = max(product.quantity - item.quantity, 0)
 
-    if payload.paid_debt > 0 and payload.client_id:
-        client = db.get(Client, payload.client_id)
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-        client.total_debt += payload.paid_debt
-        debt = Debt(client_id=client.id, sale_id=sale.id, amount=payload.paid_debt)
-        db.add(debt)
-    if payload.paid_debt > 0 and not payload.client_id:
-        raise HTTPException(status_code=400, detail="Для продажи в долг выберите клиента")
+            sale_item = SaleItem(
+                sale_id=sale.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                price=item.price,
+                discount=item.discount,
+                total=float(line_total),
+            )
+            db.add(sale_item)
+            total += line_total
 
-    db.commit()
+        paid_total = (
+            Decimal(str(payload.paid_cash))
+            + Decimal(str(payload.paid_card))
+            + Decimal(str(payload.paid_debt))
+        )
+        total = total.quantize(Decimal("0.01"))
+        paid_total = paid_total.quantize(Decimal("0.01"))
+        if paid_total != total:
+            raise HTTPException(status_code=400, detail="Сумма оплаты не совпадает с итогом")
+
+        sale.total_amount = total
+
+        if payload.paid_debt > 0 and payload.client_id:
+            client = db.get(Client, payload.client_id)
+            if not client:
+                raise HTTPException(status_code=404, detail="Client not found")
+            client.total_debt += payload.paid_debt
+            debt = Debt(client_id=client.id, sale_id=sale.id, amount=payload.paid_debt)
+            db.add(debt)
+        if payload.paid_debt > 0 and not payload.client_id:
+            raise HTTPException(status_code=400, detail="Для продажи в долг выберите клиента")
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(sale)
     db.refresh(sale, attribute_names=["items", "seller", "branch", "client"])
     return await get_sale_detail(sale.id, db=db, current_user=current_user)
@@ -201,9 +206,9 @@ async def get_sale_detail(
             joinedload(Sale.seller),
             joinedload(Sale.branch),
             joinedload(Sale.client),
-            joinedload(Sale.items).joinedload(SaleItem.product),
+            selectinload(Sale.items).selectinload(SaleItem.product),
         )
-    ).scalar_one_or_none()
+    ).scalars().unique().one_or_none()
     _assert_sale_access(sale, current_user)
 
     items: list[sales_schema.SaleItemDetail] = []
