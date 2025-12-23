@@ -26,6 +26,7 @@ import {
   Tags,
   LogOut,
   UserCircle,
+  ArrowLeftRight,
 } from "lucide-react";
 import {
   Collapsible,
@@ -39,6 +40,7 @@ import { toast } from "sonner";
 const menuItems = [
   { title: "Приход", url: "/income", icon: TrendingDown },
   { title: "Склад", url: "/warehouse", icon: Warehouse },
+  { title: "Перемещение", url: "/movements", icon: ArrowLeftRight },
   { title: "Касса", url: "/pos", icon: ShoppingCart },
   { title: "Возврат", url: "/returns", icon: RotateCcw },
   { title: "Отчет", url: "/reports", icon: FileText, adminOnly: true },
@@ -71,7 +73,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarP
   const isAdmin = user?.role === 'admin';
   const isEmployee = user?.role === 'employee';
 
-  const allowedForEmployee = ["/pos", "/warehouse", "/income", "/returns", "/categories", "/products"];
+  const allowedForEmployee = ["/pos", "/warehouse", "/income", "/returns", "/categories", "/products", "/movements"];
   const visibleMenuItems = user
     ? menuItems.filter((item) => {
         if (item.adminOnly && user.role !== "admin") return false;

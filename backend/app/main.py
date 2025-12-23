@@ -16,6 +16,7 @@ from app.api import (
     routes_returns,
     routes_movements,
     routes_sales,
+    routes_cashier,
     routes_users,
 )
 from app.core.config import get_settings
@@ -108,6 +109,7 @@ app.include_router(routes_income.router, prefix="/api/income", tags=["income"])
 app.include_router(routes_sales.router, prefix="/api/sales", tags=["sales"])
 app.include_router(routes_clients.router, prefix="/api/clients", tags=["clients"])
 app.include_router(routes_pos.router, prefix="/api/pos", tags=["pos"])
+app.include_router(routes_cashier.router, prefix="/api/cashier", tags=["cashier"])
 app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"])
 app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])

@@ -2,19 +2,30 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import get_current_user
+from app.core.config import get_settings
 from app.database.session import get_db
-from app.models.entities import Client, Debt, Product, Sale, SaleItem, Stock
+from app.models.entities import Branch, Client, Debt, Product, Sale, SaleItem, Stock
 from app.models.user import User
 from app.schemas import sales as sales_schema
 from app.services.inventory import adjust_stock
 
 router = APIRouter(redirect_slashes=False)
+logger = logging.getLogger(__name__)
+
+
+def _get_sale_branch(db: Session) -> Branch:
+    settings = get_settings()
+    branch = db.execute(select(Branch).where(Branch.name == settings.sale_branch_name)).scalar_one_or_none()
+    if not branch:
+        raise HTTPException(status_code=400, detail=f"Филиал продажи '{settings.sale_branch_name}' не найден")
+    return branch
 
 
 def _apply_date_filters(query, start_date: date | None, end_date: date | None):
@@ -82,17 +93,16 @@ async def create_sale(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == "employee":
-        branch_id = current_user.branch_id
-        seller_id = current_user.id
-        if branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-    else:
-        branch_id = payload.branch_id
-        seller_id = payload.seller_id or current_user.id
+    store_branch = _get_sale_branch(db)
+    branch_id = store_branch.id
+    if payload.branch_id and payload.branch_id != branch_id:
+        logger.warning("Ignoring branch_id %s for sale; enforcing store branch %s", payload.branch_id, branch_id)
+    seller_id = current_user.id
 
-    if branch_id is None:
-        raise HTTPException(status_code=400, detail="Не указан филиал для продажи")
+    if payload.paid_debt > 0 and not payload.client_id:
+        raise HTTPException(status_code=400, detail="Для продажи в долг выберите клиента")
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Позиции продажи не указаны")
 
     total = Decimal("0")
     sale = Sale(
@@ -115,8 +125,12 @@ async def create_sale(
         stock = db.execute(
             select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == item.product_id)
         ).scalar_one_or_none()
-        if not stock or stock.quantity < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
+        available_qty = stock.quantity if stock else 0
+        if available_qty < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Недостаточно товара '{product.name}'. Доступно: {available_qty}, запрошено: {item.quantity}",
+            )
 
         price = Decimal(str(item.price))
         discount = Decimal(str(item.discount))
@@ -155,6 +169,8 @@ async def create_sale(
         client.total_debt += payload.paid_debt
         debt = Debt(client_id=client.id, sale_id=sale.id, amount=payload.paid_debt)
         db.add(debt)
+    if payload.paid_debt > 0 and not payload.client_id:
+        raise HTTPException(status_code=400, detail="Для продажи в долг выберите клиента")
 
     db.commit()
     db.refresh(sale)
