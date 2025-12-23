@@ -60,9 +60,10 @@ type AppSidebarProps = {
   lowStockCount?: number;
   isOpen: boolean;
   onClose: () => void;
+  isLoadingUser?: boolean;
 };
 
-export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarProps) {
+export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser = false }: AppSidebarProps) {
   const { open, openMobile, setOpenMobile } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,7 +71,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose }: AppSidebarP
   const previousOpenMobile = useRef(openMobile);
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || isLoadingUser;
   const isEmployee = user?.role === 'employee';
 
   const allowedForEmployee = ["/pos", "/warehouse", "/income", "/returns", "/categories", "/products", "/movements"];

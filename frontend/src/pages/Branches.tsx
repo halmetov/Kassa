@@ -32,9 +32,9 @@ export default function Branches() {
     try {
       const data = await apiGet<{ id: number; name: string; address?: string | null; active: boolean }[]>("/api/branches");
       setBranches(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка загрузки филиалов");
+      toast.error(error?.message || "Ошибка загрузки филиалов");
     }
   };
 
@@ -48,9 +48,9 @@ export default function Branches() {
         active: true,
       });
       toast.success("Филиал добавлен");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка добавления филиала");
+      toast.error(error?.message || "Ошибка добавления филиала");
       return;
     }
     setNewBranch("");
@@ -75,9 +75,9 @@ export default function Branches() {
       toast.success("Филиал обновлен");
       setEditingId(null);
       fetchBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка обновления");
+      toast.error(error?.message || "Ошибка обновления");
     }
   };
 
@@ -86,9 +86,9 @@ export default function Branches() {
       await apiDelete(`/api/branches/${id}`);
       toast.success("Филиал удален");
       fetchBranches();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Ошибка удаления");
+      toast.error(error?.message || "Ошибка удаления");
     }
   };
 

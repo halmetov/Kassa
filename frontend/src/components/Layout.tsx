@@ -11,6 +11,7 @@ export const Layout = () => {
   const [open, setOpen] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,12 +33,20 @@ export const Layout = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const authUser = await getCurrentUser();
-      if (!authUser) {
+      try {
+        const authUser = await getCurrentUser();
+        if (!authUser) {
+          setIsLoadingUser(false);
+          navigate('/auth');
+          return;
+        }
+        setUser(authUser);
+      } catch (error: any) {
+        console.error("Failed to load current user", error);
         navigate('/auth');
-        return;
+      } finally {
+        setIsLoadingUser(false);
       }
-      setUser(authUser);
     };
 
     checkAuth();
@@ -73,6 +82,7 @@ export const Layout = () => {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar
           user={user}
+          isLoadingUser={isLoadingUser}
           lowStockCount={lowStockCount}
           isOpen={isSidebarOpen}
           onClose={closeSidebar}
