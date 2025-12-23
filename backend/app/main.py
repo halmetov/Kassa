@@ -21,6 +21,7 @@ from app.api import (
     routes_sales,
     routes_cashier,
     routes_users,
+    routes_debts,
 )
 from app.bootstrap import bootstrap
 from app.core.config import get_settings
@@ -106,6 +107,7 @@ app.include_router(routes_cashier.router, prefix="/api/cashier", tags=["cashier"
 app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"])
 app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])
+app.include_router(routes_debts.router, prefix="/api/debts", tags=["debts"])
 
 media_root = settings.media_root_path
 media_root.mkdir(parents=True, exist_ok=True)

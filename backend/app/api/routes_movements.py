@@ -219,23 +219,28 @@ async def accept_movement(
         if current_user.branch_id is None or movement.to_branch_id != current_user.branch_id:
             raise HTTPException(status_code=403, detail="Подтверждать может только принимающий филиал")
 
-    for item in movement.items:
-        stock = adjust_stock(db, movement.from_branch_id, item.product_id, 0)
-        if stock.quantity < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Недостаточно остатка {item.product.name if item.product else item.product_id} на складе",
-            )
+    try:
+        for item in movement.items:
+            stock = adjust_stock(db, movement.from_branch_id, item.product_id, 0)
+            if stock.quantity < item.quantity:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Недостаточно остатка {item.product.name if item.product else item.product_id} на складе",
+                )
 
-    for item in movement.items:
-        adjust_stock(db, movement.from_branch_id, item.product_id, -item.quantity)
-        adjust_stock(db, movement.to_branch_id, item.product_id, item.quantity)
+        for item in movement.items:
+            adjust_stock(db, movement.from_branch_id, item.product_id, -item.quantity)
+            adjust_stock(db, movement.to_branch_id, item.product_id, item.quantity)
 
-    movement.status = MovementStatus.DONE.value
-    movement.processed_by_id = current_user.id
-    movement.processed_at = datetime.utcnow()
-    movement.reason = None
-    db.commit()
+        movement.status = MovementStatus.DONE.value
+        movement.processed_by_id = current_user.id
+        movement.processed_at = datetime.utcnow()
+        movement.reason = None
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
     db.refresh(movement)
     return await get_movement_detail(movement_id, db=db, current_user=current_user)
 
@@ -265,11 +270,15 @@ async def reject_movement(
         if current_user.branch_id is None or movement.to_branch_id != current_user.branch_id:
             raise HTTPException(status_code=403, detail="Отклонить может только принимающий филиал")
 
-    movement.status = MovementStatus.REJECTED.value
-    movement.processed_by_id = current_user.id
-    movement.processed_at = datetime.utcnow()
-    movement.reason = reason
-    db.commit()
+    try:
+        movement.status = MovementStatus.REJECTED.value
+        movement.processed_by_id = current_user.id
+        movement.processed_at = datetime.utcnow()
+        movement.reason = reason
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(movement)
     return await get_movement_detail(movement_id, db=db, current_user=current_user)
 

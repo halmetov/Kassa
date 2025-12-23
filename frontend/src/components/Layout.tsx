@@ -32,6 +32,19 @@ export const Layout = () => {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("sidebar-open") : null;
+    if (saved !== null) {
+      setOpen(saved === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sidebar-open", String(open));
+    }
+  }, [open]);
+
+  useEffect(() => {
     const checkAuth = async () => {
       try {
         const authUser = await getCurrentUser();
@@ -88,7 +101,7 @@ export const Layout = () => {
           onClose={closeSidebar}
         />
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6 md:hidden">
+          <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6">
             <Button
               variant="ghost"
               size="icon"
@@ -97,6 +110,14 @@ export const Layout = () => {
                 event.stopPropagation();
                 toggleSidebar();
               }}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex"
+              onClick={() => setOpen((prev) => !prev)}
             >
               <Menu className="h-5 w-5" />
             </Button>

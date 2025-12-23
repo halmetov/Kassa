@@ -5,13 +5,13 @@ from decimal import Decimal
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.security import get_current_user
 from app.core.config import get_settings
 from app.database.session import get_db
-from app.models.entities import Branch, Client, Debt, Product, Sale, SaleItem, Stock
+from app.models.entities import Branch, Client, Debt, DebtPayment, Product, Return, Sale, SaleItem, Stock
 from app.models.user import User
 from app.schemas import sales as sales_schema
 from app.services.inventory import adjust_stock
@@ -28,11 +28,11 @@ def _get_sale_branch(db: Session) -> Branch:
     return branch
 
 
-def _apply_date_filters(query, start_date: date | None, end_date: date | None):
+def _apply_date_filters(query, start_date: date | None, end_date: date | None, column=Sale.created_at):
     if start_date:
-        query = query.where(Sale.created_at >= datetime.combine(start_date, time.min))
+        query = query.where(column >= datetime.combine(start_date, time.min))
     if end_date:
-        query = query.where(Sale.created_at <= datetime.combine(end_date, time.max))
+        query = query.where(column <= datetime.combine(end_date, time.max))
     return query
 
 
@@ -47,6 +47,7 @@ def _enforce_employee_scope(query, current_user: User):
 def _map_sale_to_summary(sale: Sale) -> sales_schema.SaleSummary:
     return sales_schema.SaleSummary(
         id=sale.id,
+        entry_type="sale",
         created_at=sale.created_at,
         branch_id=sale.branch_id,
         branch_name=sale.branch.name if sale.branch else None,
@@ -84,7 +85,99 @@ async def list_sales(
         query = query.where(Sale.client_id == client_id)
     query = _apply_date_filters(query, start_date, end_date).order_by(Sale.created_at.desc())
     sales = db.execute(query).scalars().unique().all()
-    return [_map_sale_to_summary(sale) for sale in sales]
+
+    # returns
+    return_query = (
+        select(Return)
+        .options(
+            joinedload(Return.branch),
+            joinedload(Return.created_by),
+            selectinload(Return.items),
+            joinedload(Return.sale).joinedload(Sale.client),
+            joinedload(Return.sale).joinedload(Sale.seller),
+        )
+    )
+    if branch_id:
+        return_query = return_query.where(Return.branch_id == branch_id)
+    if seller_id:
+        return_query = return_query.where(Return.created_by_id == seller_id)
+    return_query = _apply_date_filters(return_query, start_date, end_date, Return.created_at)
+    if current_user.role == "employee":
+        if current_user.branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        return_query = return_query.where(Return.branch_id == current_user.branch_id)
+    returns = db.execute(return_query.order_by(Return.created_at.desc())).scalars().unique().all()
+
+    debt_query = (
+        select(DebtPayment)
+        .options(
+            joinedload(DebtPayment.client),
+            joinedload(DebtPayment.processed_by),
+            joinedload(DebtPayment.branch),
+        )
+    )
+    if branch_id:
+        debt_query = debt_query.where(DebtPayment.branch_id == branch_id)
+    if seller_id:
+        debt_query = debt_query.where(DebtPayment.processed_by_id == seller_id)
+    debt_query = debt_query.where(func.coalesce(DebtPayment.amount, 0) != 0)
+    debt_query = _apply_date_filters(debt_query, start_date, end_date, DebtPayment.created_at)
+    if current_user.role == "employee":
+        if current_user.branch_id is None:
+            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
+        debt_query = debt_query.where(DebtPayment.branch_id == current_user.branch_id)
+    debt_payments = db.execute(debt_query.order_by(DebtPayment.created_at.desc())).scalars().unique().all()
+
+    summaries: list[sales_schema.SaleSummary] = []
+    for sale in sales:
+        summaries.append(_map_sale_to_summary(sale))
+
+    for return_entry in returns:
+        total_amount = sum(item.amount for item in return_entry.items)
+        sale = return_entry.sale
+        summaries.append(
+            sales_schema.SaleSummary(
+                id=return_entry.id,
+                entry_type="return",
+                created_at=return_entry.created_at,
+                branch_id=return_entry.branch_id,
+                branch_name=return_entry.branch.name if return_entry.branch else None,
+                seller_id=return_entry.created_by_id or 0,
+                seller_name=return_entry.created_by.name if return_entry.created_by else None,
+                client_id=sale.client_id if sale else None,
+                client_name=sale.client.name if sale and sale.client else None,
+                total_amount=-float(total_amount),
+                paid_cash=-float(total_amount),
+                paid_card=0,
+                paid_debt=0,
+                payment_type="return",
+            )
+        )
+
+    for payment in debt_payments:
+        cash_amount = float(payment.amount) if payment.payment_type == "cash" else 0.0
+        card_amount = float(payment.amount) if payment.payment_type != "cash" else 0.0
+        summaries.append(
+            sales_schema.SaleSummary(
+                id=payment.id,
+                entry_type="debt_payment",
+                created_at=payment.created_at,
+                branch_id=payment.branch_id,
+                branch_name=payment.branch.name if payment.branch else None,
+                seller_id=payment.processed_by_id or 0,
+                seller_name=payment.processed_by.name if payment.processed_by else None,
+                client_id=payment.client_id,
+                client_name=payment.client.name if payment.client else None,
+                total_amount=float(payment.amount),
+                paid_cash=cash_amount,
+                paid_card=card_amount,
+                paid_debt=0,
+                payment_type=payment.payment_type,
+            )
+        )
+
+    summaries.sort(key=lambda x: x.created_at, reverse=True)
+    return summaries
 
 
 @router.post("", response_model=sales_schema.SaleDetail, status_code=status.HTTP_201_CREATED)
