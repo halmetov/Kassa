@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useOutletContext } from "react-router-dom";
 
 type SaleSummary = {
   id: number;
@@ -72,13 +73,14 @@ type SaleDetail = {
 };
 
 export default function Reports() {
+  const { user } = useOutletContext<{ user: { id: number; role: string } | null; isAdmin: boolean }>();
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedSale, setSelectedSale] = useState<SaleDetail | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [sellers, setSellers] = useState<{ id: number; name: string }[]>([]);
-  const [sellerFilter, setSellerFilter] = useState<string>("");
+  const [sellerFilter, setSellerFilter] = useState<string | null>("all");
 
   useEffect(() => {
     const end = new Date();
@@ -93,7 +95,8 @@ export default function Reports() {
   const loadSellers = async () => {
     try {
       const users = await apiGet<{ id: number; name: string }[]>("/api/users");
-      setSellers(users);
+      const validUsers = (users || []).filter((u) => u.id !== null && u.id !== undefined);
+      setSellers(validUsers);
     } catch (error) {
       console.error(error);
     }
@@ -105,7 +108,7 @@ export default function Reports() {
       if (start) params.set("start_date", start.toISOString().split('T')[0]);
       if (end) params.set("end_date", end.toISOString().split('T')[0]);
       const seller = sellerId ?? sellerFilter;
-      if (seller) params.set("seller_id", seller);
+      if (seller && seller !== "all") params.set("seller_id", seller);
       const data = await apiGet<SaleSummary[]>(`/api/sales${params.toString() ? `?${params.toString()}` : ""}`);
       setSales(data);
     } catch (error) {
@@ -174,7 +177,7 @@ export default function Reports() {
           <div>
             <Label>Сотрудник</Label>
             <Select
-              value={sellerFilter}
+              value={sellerFilter ?? undefined}
               onValueChange={(val) => {
                 setSellerFilter(val);
                 if (startDate && endDate) {
@@ -186,12 +189,14 @@ export default function Reports() {
                 <SelectValue placeholder="Все сотрудники" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Все</SelectItem>
-                {sellers.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">Все</SelectItem>
+                {sellers
+                  .filter((s) => s.id !== null && s.id !== undefined)
+                  .map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
