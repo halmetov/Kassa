@@ -1,10 +1,12 @@
 import logging
 import sys
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.requests import Request
 from app.api import (
     routes_auth,
     routes_branches,
@@ -58,10 +60,38 @@ app.add_middleware(
     allow_origin_regex=settings.allowed_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_headers=["*"],
 )
 
 register_error_handlers(app)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    route_path = getattr(request.scope.get("route"), "path", request.url.path)
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.exception(
+            "Request failed | method=%s path=%s elapsed_ms=%.2f",
+            request.method,
+            route_path,
+            elapsed_ms,
+        )
+        raise
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    status_code = getattr(response, "status_code", 500)
+    log_method = logger.info if status_code < 400 else logger.warning if status_code < 500 else logger.error
+    log_method(
+        "Request completed | method=%s path=%s status=%s elapsed_ms=%.2f",
+        request.method,
+        route_path,
+        status_code,
+        elapsed_ms,
+    )
+    return response
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(routes_users.router, prefix="/api/users", tags=["users"])

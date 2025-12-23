@@ -50,6 +50,14 @@ class User(Base):
     movements_created = relationship(
         "Movement",
         back_populates="created_by",
+        foreign_keys="Movement.created_by_id",
+        cascade="all, delete-orphan",
+    )
+
+    processed_movements = relationship(
+        "Movement",
+        foreign_keys="Movement.processed_by_id",
+        back_populates="processed_by",
         cascade="all, delete-orphan",
     )
 

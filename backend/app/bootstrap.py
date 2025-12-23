@@ -58,6 +58,11 @@ def apply_migrations(settings: Settings) -> None:
 def ensure_admin_user(settings: Settings) -> None:
     password = _get_admin_password(settings)
     with _session_scope() as db:
+        sale_branch = (
+            db.query(Branch)
+            .filter(Branch.name == (settings.sale_branch_name or "Магазин"))
+            .first()
+        )
         admin = db.query(User).filter(User.login == "admin").first()
         if admin is None:
             logger.info("Admin user not found; creating default admin")
@@ -67,6 +72,7 @@ def ensure_admin_user(settings: Settings) -> None:
                 password_hash=get_password_hash(password),
                 role="admin",
                 active=True,
+                branch=sale_branch,
             )
             db.add(admin)
             logger.info("Admin user created")
@@ -77,6 +83,9 @@ def ensure_admin_user(settings: Settings) -> None:
             if not admin.active:
                 logger.info("Reactivating admin user")
                 admin.active = True
+            if sale_branch and admin.branch_id is None:
+                logger.info("Binding admin to default sale branch '%s'", sale_branch.name)
+                admin.branch = sale_branch
 
 
 def ensure_default_branches(settings: Settings) -> None:
@@ -104,8 +113,8 @@ def bootstrap(settings: Settings) -> None:
     logger.info("Starting application bootstrap")
     check_database_connection()
     apply_migrations(settings)
-    ensure_admin_user(settings)
     ensure_default_branches(settings)
+    ensure_admin_user(settings)
     logger.info("Bootstrap completed successfully")
 
 
