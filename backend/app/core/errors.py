@@ -46,14 +46,8 @@ def register_error_handlers(app: FastAPI) -> None:
         app.add_exception_handler(exc_cls, handler)
 
     async def integrity_error_handler(request: Request, exc: IntegrityError):  # type: ignore[override]
-        trace = _log_exception(exc)
-        payload = _build_base_payload(
-            request,
-            error_type="IntegrityError",
-            detail=f"Integrity error: {exc.orig}",
-            trace=trace,
-        )
-        return JSONResponse(status_code=400, content=payload)
+        _log_exception(exc)
+        return JSONResponse(status_code=400, content={"detail": f"Integrity error: {exc.orig}"})
 
     async def db_schema_error_handler(request: Request, exc: SQLAlchemyError):  # type: ignore[override]
         trace = _log_exception(exc)
@@ -79,7 +73,6 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=500, content=payload)
 
     async def validation_error_handler(request: Request, exc: ValidationError | RequestValidationError):  # type: ignore[override]
-        trace = _log_exception(exc)
         error_details = exc.errors()
         if error_details:
             first_error = error_details[0]
@@ -91,24 +84,20 @@ def register_error_handlers(app: FastAPI) -> None:
                 detail = f"Validation error: {msg}"
         else:
             detail = "Validation error"
-        payload = _build_base_payload(
-            request,
-            error_type="ValidationError",
-            detail=detail,
-            trace=trace,
-        )
-        return JSONResponse(status_code=422, content=payload)
+        return JSONResponse(status_code=422, content={"detail": detail})
 
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):  # type: ignore[override]
-        trace = _log_exception(exc)
         detail_message = exc.detail if exc.detail else exc.__class__.__name__
-        payload = _build_base_payload(
-            request,
-            error_type="HTTPException",
-            detail=str(detail_message),
-            trace=trace,
-        )
-        return JSONResponse(status_code=exc.status_code, content=payload)
+        if exc.status_code >= 500:
+            trace = _log_exception(exc)
+            payload = _build_base_payload(
+                request,
+                error_type="HTTPException",
+                detail=str(detail_message),
+                trace=trace,
+            )
+            return JSONResponse(status_code=exc.status_code, content=payload)
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(detail_message)})
 
     async def unhandled_error_handler(request: Request, exc: Exception):  # type: ignore[override]
         trace = _log_exception(exc)

@@ -55,3 +55,8 @@ Vite поднимет SPA на `http://localhost:5173`. В `.env` приложе
 - В каталоге `backend/app/static/uploads` сохраняются фото товаров.
 - Схема базы данных покрывает таблицы: `users, categories, products, branches, stock, income, income_items, sales, sales_items, clients, debts, returns, logs`.
 - Для интеграции с мобильной кассой используйте endpoints `/api/sales`, `/api/categories`, `/api/products`.
+
+## После обновления кода
+
+- Backend: `cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && alembic upgrade head && uvicorn app.main:app --reload`
+- Frontend: `cd frontend && npm install && npm run dev`

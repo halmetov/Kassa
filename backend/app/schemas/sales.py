@@ -29,7 +29,7 @@ class SaleItemDetail(SaleItem):
 
 
 class SaleBase(BaseModel):
-    branch_id: int
+    branch_id: Optional[int] = None
     client_id: Optional[int] = None
     seller_id: Optional[int] = None
     items: List[SaleItemCreate]

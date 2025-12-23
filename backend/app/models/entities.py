@@ -86,8 +86,11 @@ class Movement(Base, TimestampMixin):
     created_by_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    status: Mapped[str] = mapped_column(String(50), default=MovementStatus.DRAFT.value)
+    processed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default=MovementStatus.WAITING.value)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     from_branch: Mapped[Branch] = relationship(
         "Branch", foreign_keys=[from_branch_id], back_populates="outgoing_movements"
@@ -96,6 +99,7 @@ class Movement(Base, TimestampMixin):
         "Branch", foreign_keys=[to_branch_id], back_populates="incoming_movements"
     )
     created_by: Mapped[Optional["User"]] = relationship("User", back_populates="movements_created")
+    processed_by: Mapped[Optional["User"]] = relationship("User")
     items: Mapped[List["MovementItem"]] = relationship(
         "MovementItem", back_populates="movement", cascade="all, delete-orphan"
     )

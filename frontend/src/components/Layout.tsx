@@ -23,6 +23,7 @@ export const Layout = () => {
     "/returns",
     "/categories",
     "/products",
+    "/movements",
     "/clients",
   ];
 

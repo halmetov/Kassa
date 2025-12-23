@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     media_root: str = "app/static/uploads"
     vite_host: str | None = None
     vite_port: int | None = None
+    sale_branch_name: str = "Магазин"
 
     environment: str = "dev"
     auto_run_migrations: bool = True
