@@ -15,28 +15,34 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("debt_payments", sa.Column("debt_id", sa.Integer(), nullable=True))
-    op.add_column("debt_payments", sa.Column("created_by_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_debt_payments_debt_id_debts",
-        "debt_payments",
-        "debts",
-        ["debt_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-    op.create_foreign_key(
-        "fk_debt_payments_created_by_id_users",
-        "debt_payments",
-        "users",
-        ["created_by_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    with op.batch_alter_table("debt_payments") as batch_op:
+        batch_op.add_column(sa.Column("debt_id", sa.Integer(), nullable=True))
+        batch_op.add_column(sa.Column("created_by_id", sa.Integer(), nullable=True))
+
+    with op.batch_alter_table("debt_payments") as batch_op:
+        batch_op.create_foreign_key(
+            "fk_debt_payments_debt_id_debts",
+            "debts",
+            ["debt_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
+        batch_op.create_foreign_key(
+            "fk_debt_payments_created_by_id_users",
+            "users",
+            ["created_by_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_debt_payments_created_by_id_users", "debt_payments", type_="foreignkey")
-    op.drop_constraint("fk_debt_payments_debt_id_debts", "debt_payments", type_="foreignkey")
-    op.drop_column("debt_payments", "created_by_id")
-    op.drop_column("debt_payments", "debt_id")
+    with op.batch_alter_table("debt_payments") as batch_op:
+        batch_op.drop_constraint(
+            "fk_debt_payments_created_by_id_users", type_="foreignkey"
+        )
+        batch_op.drop_constraint("fk_debt_payments_debt_id_debts", type_="foreignkey")
+
+    with op.batch_alter_table("debt_payments") as batch_op:
+        batch_op.drop_column("created_by_id")
+        batch_op.drop_column("debt_id")

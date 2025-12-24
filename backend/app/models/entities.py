@@ -265,8 +265,12 @@ class DebtPayment(Base, TimestampMixin):
     branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
 
     client: Mapped[Client] = relationship(back_populates="debt_payments")
-    processed_by: Mapped[Optional["User"]] = relationship("User", back_populates="debt_payments")
-    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+    processed_by: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="debt_payments", foreign_keys=[processed_by_id]
+    )
+    created_by: Mapped[Optional["User"]] = relationship(
+        "User", back_populates="created_debt_payments", foreign_keys=[created_by_id]
+    )
     debt: Mapped[Optional[Debt]] = relationship("Debt")
     branch: Mapped[Optional[Branch]] = relationship("Branch")
 
