@@ -28,8 +28,7 @@ export const Layout = () => {
     "/products",
     "/movements",
     "/clients",
-    "/employees",
-    "/branches",
+    "/reports",
   ];
 
   const toggleSidebar = () => setMobileSidebarOpen((prev) => !prev);

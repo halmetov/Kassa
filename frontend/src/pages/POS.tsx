@@ -80,14 +80,17 @@ export default function POS() {
   const [debtAmount, setDebtAmount] = useState("");
   const [debtPaymentType, setDebtPaymentType] = useState<"cash" | "card">("cash");
 
+  const MIN_QUANTITY = 1;
+
   const parseQuantityInput = useCallback((value?: string | number) => {
     if (typeof value === "number") return Math.max(0, value);
-    const sanitized = value?.replace(/[^0-9]/g, "") || "";
-    if (sanitized === "") return 0;
+    if (value === undefined) return null;
+    const sanitized = value.replace(/[^0-9]/g, "");
+    if (sanitized === "") return null;
     return Math.max(0, parseInt(sanitized, 10));
   }, []);
 
-  const formatQuantityInput = useCallback((value: number) => (value === 0 ? "0" : String(value)), []);
+  const formatQuantityInput = useCallback((value: number) => String(value), []);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -118,7 +121,8 @@ export default function POS() {
           const matched = nextProducts.find((p) => p.id === item.product_id);
           const available_qty = matched?.available_qty ?? item.available_qty;
           const parsedInput = parseQuantityInput(item.quantityInput ?? item.quantity);
-          const safeQty = Math.min(parsedInput, available_qty);
+          const numeric = parsedInput ?? item.quantity ?? MIN_QUANTITY;
+          const safeQty = Math.max(MIN_QUANTITY, Math.min(numeric, available_qty));
           return {
             ...item,
             available_qty,
@@ -213,9 +217,9 @@ export default function POS() {
           product_id: product.id,
           name: product.name,
           price: product.sale_price,
-          quantity: 0,
-          quantityInput: "0",
-          total: 0,
+          quantity: MIN_QUANTITY,
+          quantityInput: String(MIN_QUANTITY),
+          total: MIN_QUANTITY * product.sale_price,
           available_qty: product.available_qty,
         },
       ]);
@@ -226,9 +230,10 @@ export default function POS() {
     setCart(
       cart.map((item) => {
         if (item.product_id === product_id) {
-          const desired = Math.max(0, item.quantity + delta);
-          const newQty = Math.min(desired, item.available_qty);
-          if (desired > item.available_qty) {
+          const desired = item.quantity + delta;
+          const normalized = Math.max(MIN_QUANTITY, desired);
+          const newQty = Math.min(normalized, item.available_qty);
+          if (normalized > item.available_qty) {
             toast.error(`Не хватает. Доступно: ${item.available_qty}`);
           }
           return {
@@ -247,11 +252,12 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.product_id !== product_id) return item;
-        const parsed = parseQuantityInput(raw);
+        const sanitized = raw.replace(/[^0-9]/g, "");
+        const parsed = sanitized === "" ? 0 : parseInt(sanitized, 10);
         return {
           ...item,
           quantity: parsed,
-          quantityInput: raw.replace(/[^0-9]/g, ""),
+          quantityInput: raw === "" ? "" : sanitized,
           total: parsed * item.price,
         };
       }),
@@ -263,7 +269,8 @@ export default function POS() {
       prev.map((item) => {
         if (item.product_id !== product_id) return item;
         const parsed = parseQuantityInput(item.quantityInput ?? item.quantity);
-        const clamped = Math.min(parsed, item.available_qty);
+        const normalized = parsed === null || parsed < MIN_QUANTITY ? MIN_QUANTITY : parsed;
+        const clamped = Math.min(normalized, item.available_qty);
         return {
           ...item,
           quantity: clamped,
@@ -278,10 +285,7 @@ export default function POS() {
     setCart((prev) =>
       prev.map((item) => {
         if (item.product_id !== product_id) return item;
-        if ((item.quantityInput ?? String(item.quantity)) === "0") {
-          return { ...item, quantityInput: "", quantity: 0, total: 0 };
-        }
-        return item;
+        return { ...item, quantityInput: item.quantityInput === "0" ? "" : item.quantityInput };
       }),
     );
   };

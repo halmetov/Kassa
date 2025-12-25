@@ -62,6 +62,8 @@ const statusLabels: Record<string, string> = {
   rejected: "Отклонено",
 };
 
+const MIN_MOVEMENT_QTY = 1;
+
 export default function Movements() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -178,7 +180,10 @@ export default function Movements() {
       toast.error("Выберите филиал-отправитель");
       return;
     }
-    setItems((prev) => [...prev, { product_id: 0, quantity: 0, quantityInput: "0", available: 0 }]);
+    setItems((prev) => [
+      ...prev,
+      { product_id: 0, quantity: MIN_MOVEMENT_QTY, quantityInput: String(MIN_MOVEMENT_QTY), available: 0 },
+    ]);
   };
 
   const updateItem = (index: number, update: Partial<MovementItem>) => {
@@ -191,15 +196,17 @@ export default function Movements() {
 
   const parseQuantityInput = (value?: string | number) => {
     if (typeof value === "number") return Math.max(0, value);
-    const sanitized = value?.replace(/[^0-9]/g, "") || "";
-    if (sanitized === "") return 0;
+    if (value === undefined) return null;
+    const sanitized = value.replace(/[^0-9]/g, "");
+    if (sanitized === "") return null;
     return Math.max(0, parseInt(sanitized, 10));
   };
 
   const normalizeQuantityInput = (value: string | undefined, max: number) => {
     const parsed = parseQuantityInput(value);
-    const clamped = Math.min(parsed, max);
-    const display = clamped === 0 ? "0" : String(clamped);
+    const normalized = parsed === null || parsed < MIN_MOVEMENT_QTY ? MIN_MOVEMENT_QTY : parsed;
+    const clamped = Math.min(normalized, max);
+    const display = String(clamped);
     return { parsed, clamped, display };
   };
 
@@ -217,7 +224,7 @@ export default function Movements() {
       return;
     }
     for (const item of items) {
-      const parsedQty = parseQuantityInput(item.quantityInput ?? item.quantity);
+      const parsedQty = parseQuantityInput(item.quantityInput ?? item.quantity) ?? 0;
       if (!item.product_id) {
         toast.error("Выберите товар");
         return;
@@ -238,7 +245,7 @@ export default function Movements() {
         comment: comment || null,
         items: items.map((item) => ({
           product_id: item.product_id,
-          quantity: parseQuantityInput(item.quantityInput ?? item.quantity),
+          quantity: parseQuantityInput(item.quantityInput ?? item.quantity) ?? MIN_MOVEMENT_QTY,
           purchase_price: null,
           selling_price: null,
         })),
@@ -355,7 +362,7 @@ export default function Movements() {
                   value={item.product_id ? String(item.product_id) : ""}
                   onValueChange={(val) => {
                     const selected = stockOptions.find((opt) => opt.value === Number(val));
-                    const currentQty = parseQuantityInput(item.quantityInput ?? item.quantity);
+                    const currentQty = parseQuantityInput(item.quantityInput ?? item.quantity) ?? MIN_MOVEMENT_QTY;
                     const cappedQty = Math.min(currentQty, selected?.available || currentQty);
                     updateItem(index, {
                       product_id: Number(val),
@@ -391,21 +398,22 @@ export default function Movements() {
                   }}
                   onChange={(e) => {
                     const raw = e.target.value;
-                    const parsed = parseQuantityInput(raw);
-                    updateItem(index, { quantityInput: raw, quantity: parsed });
+                    const sanitized = raw.replace(/[^0-9]/g, "");
+                    const parsed = sanitized === "" ? 0 : parseInt(sanitized, 10);
+                    updateItem(index, { quantityInput: raw === "" ? "" : sanitized, quantity: parsed });
                   }}
                   onBlur={() => {
                     const { clamped, display } = normalizeQuantityInput(item.quantityInput ?? "0", item.available || 0);
                     updateItem(index, { quantity: clamped, quantityInput: display });
                   }}
                   className={
-                    parseQuantityInput(item.quantityInput ?? item.quantity) > item.available
+                    (parseQuantityInput(item.quantityInput ?? item.quantity) ?? 0) > item.available
                       ? "border-destructive focus-visible:ring-destructive"
                       : undefined
                   }
                 />
                 <div className="text-xs text-muted-foreground">Доступно: {item.available}</div>
-                {parseQuantityInput(item.quantityInput ?? item.quantity) > item.available && (
+                {(parseQuantityInput(item.quantityInput ?? item.quantity) ?? 0) > item.available && (
                   <div className="text-xs text-destructive">Количество превышает доступный остаток</div>
                 )}
               </div>
