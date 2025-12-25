@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/api-url";
+import { clearCartState } from "@/lib/cartStorage";
 
 const ACCESS_TOKEN_KEY = "kassa_access_token";
 const REFRESH_TOKEN_KEY = "kassa_refresh_token";
@@ -113,4 +114,5 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 export function signOut() {
   clearTokens();
+  clearCartState();
 }

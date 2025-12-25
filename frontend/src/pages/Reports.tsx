@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AuthUser } from "@/lib/auth";
 
 type SaleSummary = {
   id: number;
@@ -88,6 +90,7 @@ const formatDateInput = (date: Date) => date.toISOString().split("T")[0];
 const formatAmount = (value?: number | null) => (value ?? 0).toFixed(2);
 
 export default function Reports() {
+  const { user } = useOutletContext<{ user: AuthUser | null }>();
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -108,6 +111,15 @@ export default function Reports() {
     fetchReportData(start, now);
     loadSellers();
   }, []);
+
+  useEffect(() => {
+    if (!user || !startDate || !endDate) return;
+    if (user.role === "employee") {
+      const selfId = String(user.id);
+      setSellerFilter(selfId);
+      fetchReportData(new Date(startDate), new Date(endDate), selfId);
+    }
+  }, [user, startDate, endDate]);
 
   const loadSellers = async () => {
     try {
