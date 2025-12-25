@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Search, ShoppingCart, Trash2, Plus, Minus, HandCoins } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, HandCoins, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { apiGet, apiPost } from "@/api/client";
 import { AuthUser, getCurrentUser } from "@/lib/auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { CART_TTL_MS, loadStoredCart, saveCartState, clearCartState } from "@/lib/cartStorage";
 
 interface Category {
   id: number;
@@ -79,8 +81,12 @@ export default function POS() {
   const [debtClientId, setDebtClientId] = useState("");
   const [debtAmount, setDebtAmount] = useState("");
   const [debtPaymentType, setDebtPaymentType] = useState<"cash" | "card">("cash");
+  const [lastCartUpdate, setLastCartUpdate] = useState<number | null>(null);
+  const [hasHydratedCart, setHasHydratedCart] = useState(false);
+  const [activeTab, setActiveTab] = useState<"products" | "cart">("products");
 
   const MIN_QUANTITY = 1;
+  const isMobile = useIsMobile();
 
   const parseQuantityInput = useCallback((value?: string | number) => {
     if (typeof value === "number") return Math.max(0, value);
@@ -110,9 +116,35 @@ export default function POS() {
 
   useEffect(() => {
     if (user) {
+      const stored = loadStoredCart<CartItem>(user.id);
+      setCart(stored?.cart ?? []);
+      setLastCartUpdate(stored?.updatedAt ?? null);
+      setHasHydratedCart(true);
       fetchData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !hasHydratedCart) return;
+    saveCartState<CartItem>(user.id, cart);
+    setLastCartUpdate(Date.now());
+  }, [cart, user, hasHydratedCart]);
+
+  useEffect(() => {
+    if (!lastCartUpdate) return;
+    const checker = setInterval(() => {
+      if (lastCartUpdate && Date.now() - lastCartUpdate > CART_TTL_MS) {
+        setCart([]);
+        setLastCartUpdate(null);
+        if (user) {
+          saveCartState<CartItem>(user.id, []);
+        } else {
+          clearCartState();
+        }
+      }
+    }, 30_000);
+    return () => clearInterval(checker);
+  }, [lastCartUpdate, user]);
 
   const syncCartWithStock = useCallback(
     (nextProducts: Product[]) => {
@@ -253,12 +285,13 @@ export default function POS() {
       prev.map((item) => {
         if (item.product_id !== product_id) return item;
         const sanitized = raw.replace(/[^0-9]/g, "");
-        const parsed = sanitized === "" ? 0 : parseInt(sanitized, 10);
+        const parsed = sanitized === "" ? null : parseInt(sanitized, 10);
+        const safeQty = parsed === null ? 0 : Math.min(parsed, item.available_qty);
         return {
           ...item,
-          quantity: parsed,
+          quantity: safeQty,
           quantityInput: raw === "" ? "" : sanitized,
-          total: parsed * item.price,
+          total: safeQty * item.price,
         };
       }),
     );
@@ -438,8 +471,8 @@ export default function POS() {
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-4">
-      <div className="flex-1 space-y-4">
+    <div className="h-full flex flex-col lg:flex-row gap-4 pb-20 lg:pb-0">
+      <div className={cn("flex-1 space-y-4", isMobile && activeTab !== "products" ? "hidden" : "") }>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -500,7 +533,12 @@ export default function POS() {
         </div>
       </div>
 
-      <Card className="w-full lg:w-96 p-4 flex flex-col">
+      <Card
+        className={cn(
+          "w-full lg:w-96 p-4 flex flex-col",
+          isMobile && activeTab !== "cart" ? "hidden" : "",
+        )}
+      >
         <div className="flex items-center gap-2 mb-4">
           <ShoppingCart className="h-5 w-5" />
           <h2 className="text-xl font-bold">Корзина</h2>
@@ -596,6 +634,25 @@ export default function POS() {
           </Button>
         </div>
       </Card>
+
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-card grid grid-cols-2">
+          <Button
+            variant={activeTab === "products" ? "default" : "ghost"}
+            className="rounded-none"
+            onClick={() => setActiveTab("products")}
+          >
+            <Package className="h-4 w-4 mr-2" /> Товары
+          </Button>
+          <Button
+            variant={activeTab === "cart" ? "default" : "ghost"}
+            className="rounded-none"
+            onClick={() => setActiveTab("cart")}
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" /> Корзина
+          </Button>
+        </div>
+      )}
 
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
         <DialogContent className="max-w-md">
