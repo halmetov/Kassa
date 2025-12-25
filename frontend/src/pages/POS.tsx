@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Search, ShoppingCart, Trash2, Plus, Minus, HandCoins } from "lucide-react";
 import {
   Dialog,
@@ -51,6 +52,7 @@ type CartItem = {
   name: string;
   price: number;
   quantity: number;
+  quantityInput?: string;
   total: number;
   available_qty: number;
 };
@@ -78,6 +80,15 @@ export default function POS() {
   const [debtAmount, setDebtAmount] = useState("");
   const [debtPaymentType, setDebtPaymentType] = useState<"cash" | "card">("cash");
 
+  const parseQuantityInput = useCallback((value?: string | number) => {
+    if (typeof value === "number") return Math.max(0, value);
+    const sanitized = value?.replace(/[^0-9]/g, "") || "";
+    if (sanitized === "") return 0;
+    return Math.max(0, parseInt(sanitized, 10));
+  }, []);
+
+  const formatQuantityInput = useCallback((value: number) => (value === 0 ? "0" : String(value)), []);
+
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -100,21 +111,26 @@ export default function POS() {
     }
   }, [user]);
 
-  const syncCartWithStock = useCallback((nextProducts: Product[]) => {
-    setCart((prev) =>
-      prev.map((item) => {
-        const matched = nextProducts.find((p) => p.id === item.product_id);
-        const available_qty = matched?.available_qty ?? item.available_qty;
-        const safeQty = Math.min(item.quantity, available_qty);
-        return {
-          ...item,
-          available_qty,
-          quantity: safeQty,
-          total: safeQty * item.price,
-        };
-      }),
-    );
-  }, []);
+  const syncCartWithStock = useCallback(
+    (nextProducts: Product[]) => {
+      setCart((prev) =>
+        prev.map((item) => {
+          const matched = nextProducts.find((p) => p.id === item.product_id);
+          const available_qty = matched?.available_qty ?? item.available_qty;
+          const parsedInput = parseQuantityInput(item.quantityInput ?? item.quantity);
+          const safeQty = Math.min(parsedInput, available_qty);
+          return {
+            ...item,
+            available_qty,
+            quantity: safeQty,
+            quantityInput: item.quantityInput === "" ? "" : formatQuantityInput(safeQty),
+            total: safeQty * item.price,
+          };
+        }),
+      );
+    },
+    [formatQuantityInput, parseQuantityInput],
+  );
 
   const loadProducts = useCallback(async () => {
     setIsLoadingProducts(true);
@@ -183,8 +199,9 @@ export default function POS() {
           item.product_id === product.id
             ? {
                 ...item,
-                quantity: item.quantity + 1,
-                total: (item.quantity + 1) * item.price,
+                quantity: Math.min(item.quantity + 1, product.available_qty),
+                quantityInput: formatQuantityInput(Math.min(item.quantity + 1, product.available_qty)),
+                total: Math.min(item.quantity + 1, product.available_qty) * item.price,
               }
             : item,
         ),
@@ -196,8 +213,9 @@ export default function POS() {
           product_id: product.id,
           name: product.name,
           price: product.sale_price,
-          quantity: 1,
-          total: product.sale_price,
+          quantity: 0,
+          quantityInput: "0",
+          total: 0,
           available_qty: product.available_qty,
         },
       ]);
@@ -208,12 +226,60 @@ export default function POS() {
     setCart(
       cart.map((item) => {
         if (item.product_id === product_id) {
-          const desired = Math.max(1, item.quantity + delta);
+          const desired = Math.max(0, item.quantity + delta);
           const newQty = Math.min(desired, item.available_qty);
           if (desired > item.available_qty) {
             toast.error(`Не хватает. Доступно: ${item.available_qty}`);
           }
-          return { ...item, quantity: newQty, total: newQty * item.price };
+          return {
+            ...item,
+            quantity: newQty,
+            quantityInput: formatQuantityInput(newQty),
+            total: newQty * item.price,
+          };
+        }
+        return item;
+      }),
+    );
+  };
+
+  const handleManualQuantityChange = (product_id: number, raw: string) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product_id !== product_id) return item;
+        const parsed = parseQuantityInput(raw);
+        return {
+          ...item,
+          quantity: parsed,
+          quantityInput: raw.replace(/[^0-9]/g, ""),
+          total: parsed * item.price,
+        };
+      }),
+    );
+  };
+
+  const handleQuantityBlur = (product_id: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product_id !== product_id) return item;
+        const parsed = parseQuantityInput(item.quantityInput ?? item.quantity);
+        const clamped = Math.min(parsed, item.available_qty);
+        return {
+          ...item,
+          quantity: clamped,
+          quantityInput: formatQuantityInput(clamped),
+          total: clamped * item.price,
+        };
+      }),
+    );
+  };
+
+  const handleQuantityFocus = (product_id: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product_id !== product_id) return item;
+        if ((item.quantityInput ?? String(item.quantity)) === "0") {
+          return { ...item, quantityInput: "", quantity: 0, total: 0 };
         }
         return item;
       }),
@@ -244,6 +310,10 @@ export default function POS() {
     }
     if (cart.length === 0) {
       toast.error("Корзина пуста");
+      return;
+    }
+    if (cart.some((item) => item.quantity <= 0)) {
+      toast.error("Количество товара должно быть больше 0");
       return;
     }
     const totalAmount = getTotalAmount();
@@ -463,16 +533,17 @@ export default function POS() {
                   </Button>
                   <Input
                     type="number"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      const capped = Math.min(val, item.available_qty);
-                      if (val > item.available_qty) {
-                        toast.error(`Не хватает. Доступно: ${item.available_qty}`);
-                      }
-                      updateQuantity(item.product_id, capped - item.quantity);
-                    }}
-                    className="w-16 text-center"
+                    inputMode="numeric"
+                    value={item.quantityInput ?? String(item.quantity ?? 0)}
+                    onChange={(e) => handleManualQuantityChange(item.product_id, e.target.value)}
+                    onFocus={() => handleQuantityFocus(item.product_id)}
+                    onBlur={() => handleQuantityBlur(item.product_id)}
+                    className={cn(
+                      "w-16 text-center",
+                      item.quantity > item.available_qty
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : undefined,
+                    )}
                   />
                   <Button
                     size="icon"
