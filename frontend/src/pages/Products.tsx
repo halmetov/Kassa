@@ -43,6 +43,7 @@ interface Product {
   quantity: number;
   image_url?: string | null;
   photo?: string | null;
+  rating?: number | null;
 }
 
 export default function Products() {
@@ -64,9 +65,10 @@ export default function Products() {
     sale_price: "0",
     wholesale_price: "0",
     limit: "0",
+    rating: "0",
   });
 
-  const [editData, setEditData] = useState<any>({});
+  const [editData, setEditData] = useState<any>({ rating: "0" });
 
   useEffect(() => {
     fetchProducts();
@@ -108,6 +110,7 @@ export default function Products() {
       sale_price: parseFloat(formData.sale_price) || 0,
       wholesale_price: parseFloat(formData.wholesale_price) || 0,
       limit: parseInt(formData.limit) || 0,
+      rating: Math.max(0, parseInt(formData.rating, 10) || 0),
     };
 
     try {
@@ -140,6 +143,7 @@ export default function Products() {
       sale_price: "0",
       wholesale_price: "0",
       limit: "0",
+      rating: "0",
     });
     setNewPhotoFile(null);
     fetchProducts();
@@ -156,6 +160,7 @@ export default function Products() {
       sale_price: product.sale_price.toString(),
       wholesale_price: product.wholesale_price.toString(),
       limit: (product.limit ?? 0).toString(),
+      rating: (product.rating ?? 0).toString(),
     });
     setEditPhotoFile(null);
     setSelectedProduct(product);
@@ -172,6 +177,7 @@ export default function Products() {
         sale_price: parseFloat(editData.sale_price) || 0,
         wholesale_price: parseFloat(editData.wholesale_price) || 0,
         limit: parseInt(editData.limit) || 0,
+        rating: Math.max(0, parseInt(editData.rating, 10) || 0),
       });
 
       if (editPhotoFile) {
@@ -200,6 +206,7 @@ export default function Products() {
               sale_price: parseFloat(editData.sale_price) || 0,
               wholesale_price: parseFloat(editData.wholesale_price) || 0,
               limit: parseInt(editData.limit) || 0,
+              rating: Math.max(0, parseInt(editData.rating, 10) || 0),
             }
           : prev,
       );
@@ -343,6 +350,15 @@ export default function Products() {
               onChange={(e) => setFormData({ ...formData, limit: e.target.value })}
             />
           </div>
+          <div>
+            <Label>Рейтинг</Label>
+            <Input
+              type="number"
+              value={formData.rating}
+              onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+              min={0}
+            />
+          </div>
         </div>
         <Button onClick={handleAdd}>Добавить товар</Button>
       </Card>
@@ -453,6 +469,7 @@ export default function Products() {
                   <div><span className="text-muted-foreground">Цена продажи:</span> {selectedProduct.sale_price} ₸</div>
                   <div><span className="text-muted-foreground">Цена оптом:</span> {selectedProduct.wholesale_price} ₸</div>
                   <div><span className="text-muted-foreground">Лимит:</span> {selectedProduct.limit ?? 0}</div>
+                  <div><span className="text-muted-foreground">Рейтинг:</span> {selectedProduct.rating ?? 0}</div>
                   <div><span className="text-muted-foreground">Доступно:</span> {selectedProduct.quantity}</div>
                 </div>
               </div>
@@ -528,6 +545,15 @@ export default function Products() {
                       type="number"
                       value={editData.limit}
                       onChange={(e) => setEditData({ ...editData, limit: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Рейтинг</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={editData.rating}
+                      onChange={(e) => setEditData({ ...editData, rating: e.target.value })}
                     />
                   </div>
                 </div>
