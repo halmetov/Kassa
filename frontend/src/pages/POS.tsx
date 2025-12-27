@@ -87,6 +87,7 @@ export default function POS() {
 
   const MIN_QUANTITY = 1;
   const isMobile = useIsMobile();
+  const cartBadgeCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
   const parseQuantityInput = useCallback((value?: string | number) => {
     if (typeof value === "number") return Math.max(0, value);
@@ -636,7 +637,10 @@ export default function POS() {
       </Card>
 
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 border-t bg-card grid grid-cols-2">
+        <div
+          className="fixed bottom-0 left-0 right-0 border-t bg-card grid grid-cols-2"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
+        >
           <Button
             variant={activeTab === "products" ? "default" : "ghost"}
             className="rounded-none"
@@ -650,6 +654,11 @@ export default function POS() {
             onClick={() => setActiveTab("cart")}
           >
             <ShoppingCart className="h-4 w-4 mr-2" /> Корзина
+            {cartBadgeCount > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-destructive px-2 text-xs font-semibold text-destructive-foreground">
+                {cartBadgeCount}
+              </span>
+            )}
           </Button>
         </div>
       )}
