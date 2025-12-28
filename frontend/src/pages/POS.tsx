@@ -553,7 +553,7 @@ export default function POS() {
                     <img
                       src={product.image_url || product.photo || ""}
                       alt={product.name}
-                      className="h-36 w-full object-cover"
+                      className="h-36 w-full object-contain object-center bg-white"
                     />
                   ) : (
                     <div className="h-36 w-full flex items-center justify-center text-muted-foreground text-sm">
