@@ -30,7 +30,7 @@ pip install -r requirements.txt
 cp .env.example .env  # настройте DATABASE_URL и JWT_SECRET_KEY при необходимости
 alembic upgrade head           # применит миграции
 python -m app.bootstrap        # создаст admin (пароль из ADMIN_PASSWORD или 'admin') и филиалы
-uvicorn app.main:app --reload  # приложение само запускает bootstrap при старте
+PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload  # приложение само запускает bootstrap при старте
 ```
 
 ### Возможности
@@ -67,7 +67,8 @@ pip install -r requirements.txt
 $env:DATABASE_URL="postgresql+psycopg2://postgres:123@localhost:5432/kassa_db"  # пример
 alembic upgrade head
 python -m app.bootstrap
-python main.py  # или uvicorn app.main:app --reload
+set PYTHONPATH=.  # или $env:PYTHONPATH='.' для PowerShell
+python main.py  # или uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Frontend
 cd ..\frontend

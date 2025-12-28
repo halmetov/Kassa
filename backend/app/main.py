@@ -74,11 +74,14 @@ def log_registered_routes(application: FastAPI) -> None:
 async def lifespan(app: FastAPI):
     log_startup_configuration()
     logger.info("Application startup: running bootstrap")
+    startup_start = time.perf_counter()
     try:
         bootstrap(settings)
-    except Exception as exc:
-        logger.exception("Application bootstrap failed")
-        raise SystemExit("Application failed to start; see logs above for details.") from exc
+    except Exception:
+        logger.exception(
+            "Application bootstrap failed; API will continue to start regardless of bootstrap errors"
+        )
+    logger.info("Application startup complete. elapsed=%.2fs", time.perf_counter() - startup_start)
     yield
     logger.info("Application shutdown complete")
 
