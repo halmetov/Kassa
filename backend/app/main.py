@@ -4,8 +4,9 @@ import time
 from contextlib import asynccontextmanager
 from pprint import pformat
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 from app.api import (
@@ -145,6 +146,24 @@ media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=media_root), name="static")
 
 log_registered_routes(app)
+
+
+frontend_dist_dir = settings.project_root / "frontend" / "dist"
+frontend_index = frontend_dist_dir / "index.html"
+if frontend_index.exists():
+    assets_dir = frontend_dist_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+    logger.info("Frontend dist detected at %s; enabling SPA fallback", frontend_dist_dir)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        protected_prefixes = ("api", "static", "docs", "redoc")
+        if any(full_path.startswith(prefix) for prefix in protected_prefixes):
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(frontend_index)
+else:
+    logger.info("Frontend dist folder not found at %s; SPA fallback disabled", frontend_dist_dir)
 
 
 @app.get("/api/health", tags=["system"])

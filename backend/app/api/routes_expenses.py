@@ -1,8 +1,10 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
@@ -41,6 +43,15 @@ def _resolve_branch_id(current_user: User, branch_id: int | None) -> int | None:
     return branch_id
 
 
+def _handle_expense_db_error(message: str, exc: SQLAlchemyError) -> JSONResponse:
+    trace_id = str(uuid.uuid4())
+    logger.exception("%s | trace_id=%s", message, trace_id, exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": message, "error_code": "expenses_database_error", "trace_id": trace_id},
+    )
+
+
 @router.get("", response_model=list[ExpenseOut], dependencies=[Depends(require_employee)])
 async def list_expenses(
     start_date: date | None = None,
@@ -48,17 +59,21 @@ async def list_expenses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    start_dt, end_dt = _get_date_range(start_date, end_date)
-    branch_id = _resolve_branch_id(current_user, None)
-    query = (
-        select(Expense)
-        .options(joinedload(Expense.created_by))
-        .where(Expense.created_at >= start_dt, Expense.created_at <= end_dt)
-        .order_by(Expense.created_at.desc())
-    )
-    if branch_id is not None:
-        query = query.where(Expense.branch_id == branch_id)
-    expenses = db.execute(query).scalars().unique().all()
+    try:
+        start_dt, end_dt = _get_date_range(start_date, end_date)
+        branch_id = _resolve_branch_id(current_user, None)
+        query = (
+            select(Expense)
+            .options(joinedload(Expense.created_by))
+            .where(Expense.created_at >= start_dt, Expense.created_at <= end_dt)
+            .order_by(Expense.created_at.desc())
+        )
+        if branch_id is not None:
+            query = query.where(Expense.branch_id == branch_id)
+        expenses = db.execute(query).scalars().unique().all()
+    except SQLAlchemyError as exc:
+        return _handle_expense_db_error("Не удалось получить список расходов", exc)
+
     return [
         ExpenseOut.model_validate(
             expense,
@@ -98,8 +113,7 @@ async def create_expense(
         db.refresh(expense)
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Failed to create expense", exc_info=exc)
-        raise HTTPException(status_code=500, detail="Не удалось сохранить расход") from exc
+        return _handle_expense_db_error("Не удалось сохранить расход", exc)
 
     return ExpenseOut.model_validate(
         expense,
