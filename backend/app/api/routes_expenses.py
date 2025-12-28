@@ -34,11 +34,9 @@ def _resolve_branch_id(current_user: User, branch_id: int | None) -> int | None:
         return branch_id
 
     user_branch_id = current_user.branch_id
-    if user_branch_id is None:
-        raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
     if branch_id is None:
         return user_branch_id
-    if branch_id != user_branch_id:
+    if user_branch_id is not None and branch_id != user_branch_id:
         raise HTTPException(status_code=403, detail="Недостаточно прав для этого филиала")
     return branch_id
 

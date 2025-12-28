@@ -150,20 +150,28 @@ log_registered_routes(app)
 
 frontend_dist_dir = settings.project_root / "frontend" / "dist"
 frontend_index = frontend_dist_dir / "index.html"
-if frontend_index.exists():
-    assets_dir = frontend_dist_dir / "assets"
-    if assets_dir.exists():
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
-    logger.info("Frontend dist detected at %s; enabling SPA fallback", frontend_dist_dir)
 
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
-        protected_prefixes = ("api", "static", "docs", "redoc")
-        if any(full_path.startswith(prefix) for prefix in protected_prefixes):
-            raise HTTPException(status_code=404, detail="Not found")
-        return FileResponse(frontend_index)
+assets_dir = frontend_dist_dir / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+    logger.info("Serving frontend assets from %s", assets_dir)
 else:
-    logger.info("Frontend dist folder not found at %s; SPA fallback disabled", frontend_dist_dir)
+    logger.warning("Frontend assets directory not found at %s; assets mount skipped", assets_dir)
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str):
+    protected_prefixes = ("api", "static", "docs", "redoc", "openapi.json")
+    if any(full_path.startswith(prefix) for prefix in protected_prefixes):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if frontend_index.exists():
+        return FileResponse(frontend_index)
+
+    logger.error(
+        "SPA fallback attempted but frontend build is missing | path=%s index=%s", full_path, frontend_index
+    )
+    raise HTTPException(status_code=503, detail="Frontend build not found; run npm run build")
 
 
 @app.get("/api/health", tags=["system"])
