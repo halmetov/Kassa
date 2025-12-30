@@ -545,8 +545,7 @@ export default function POS() {
             return (
               <Card
                 key={product.id}
-                className="overflow-hidden cursor-pointer hover:border-primary transition"
-                onClick={() => addToCart(product)}
+                className="overflow-hidden hover:border-primary transition"
               >
                 <div className="relative bg-muted/40">
                   {product.image_url || product.photo ? (
