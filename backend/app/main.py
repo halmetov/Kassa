@@ -89,13 +89,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Kassa API", version="1.0.0", redirect_slashes=False, lifespan=lifespan)
 app.router.redirect_slashes = False
 
+cors_origins = set(settings.allowed_cors_origins)
+cors_origins.update({"http://localhost:8080", "http://127.0.0.1:8080"})
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_cors_origins,
+    allow_origins=sorted(cors_origins),
     allow_origin_regex=settings.allowed_cors_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 register_error_handlers(app)
@@ -127,6 +131,13 @@ async def log_requests(request: Request, call_next):
         elapsed_ms,
     )
     return response
+
+
+# Keep CORSMiddleware as the outermost wrapper so error responses also carry CORS headers
+app.user_middleware = sorted(
+    app.user_middleware, key=lambda middleware: 0 if middleware.cls is CORSMiddleware else 1
+)
+app.middleware_stack = app.build_middleware_stack()
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(routes_users.router, prefix="/api/users", tags=["users"])
@@ -164,7 +175,7 @@ else:
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str):
-    protected_prefixes = ("api", "static", "docs", "redoc", "openapi.json")
+    protected_prefixes = ("api", "static", "assets", "docs", "redoc", "openapi.json")
     if any(full_path.startswith(prefix) for prefix in protected_prefixes):
         raise HTTPException(status_code=404, detail="Not found")
 

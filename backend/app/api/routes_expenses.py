@@ -76,7 +76,10 @@ async def list_expenses(
         ExpenseOut.model_validate(
             expense,
             from_attributes=True,
-            update={"created_by_name": expense.created_by.name if expense.created_by else None},
+            update={
+                "created_by_name": expense.created_by.name if expense.created_by else None,
+                "amount": float(expense.amount),
+            },
         )
         for expense in expenses
     ]
@@ -116,7 +119,7 @@ async def create_expense(
     return ExpenseOut.model_validate(
         expense,
         from_attributes=True,
-        update={"created_by_name": current_user.name},
+        update={"created_by_name": current_user.name, "amount": float(expense.amount)},
     )
 
 
