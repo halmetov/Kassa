@@ -16,6 +16,20 @@
 
 ## Backend
 
+### Локальный запуск (кратко)
+
+```bash
+# Backend
+cd backend && python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head  # применит миграции (dev: если миграций нет, схема создастся из моделей)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Frontend
+cd ../frontend && npm install
+npm run dev  # http://localhost:5173
+```
+
 ### Версия Python
 
 Проект собран и проверен на **Python 3.11/3.12**. Новые версии (например, 3.14) могут быть несовместимы с FastAPI/Starlette/Passlib, поэтому используйте 3.11 или 3.12 для создания окружения.
@@ -79,7 +93,7 @@ npm run dev  # или npm run build
 ## Дополнительно
 
 - При первом запуске (через `python -m app.bootstrap` или при старте uvicorn) автоматически создаются филиалы: `Магазин`, `Склад1`, `Склад2`, а также пользователь `admin` с паролем из переменной `ADMIN_PASSWORD` (или `admin` по умолчанию).
-- CORS настроен для `http://localhost:8080` и `http://127.0.0.1:8080` с поддержкой credentials.
+- CORS настроен для `http://localhost:8080`, `http://127.0.0.1:8080`, `http://localhost:5173`, `http://127.0.0.1:5173` (credentials включены).
 - В каталоге `backend/app/static/uploads` сохраняются фото товаров.
 - Схема базы данных покрывает таблицы: `users, categories, products, branches, stock, income, income_items, sales, sales_items, clients, debts, returns, logs`.
 - Для интеграции с мобильной кассой используйте endpoints `/api/sales`, `/api/categories`, `/api/products`.

@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 import logging
 import uuid
@@ -21,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_date_range(start_date: date | None, end_date: date | None) -> tuple[datetime, datetime]:
-    today = date.today()
-    start = datetime.combine(start_date or today, time.min)
+    today = datetime.now(timezone.utc).date()
+    start = datetime.combine(start_date or today, time.min, tzinfo=timezone.utc)
     end_boundary = end_date or today
-    end = datetime.combine(end_boundary, time.max)
+    end = datetime.combine(end_boundary, time.max, tzinfo=timezone.utc)
     return start, end
 
 
