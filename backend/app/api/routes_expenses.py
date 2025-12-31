@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 import uuid
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
@@ -61,6 +62,40 @@ def _log_expense_call(origin: str | None, method: str, status_code: int, trace_i
     )
 
 
+def _log_request_entry(request: Request, current_user: User | None, trace_id: str) -> None:
+    headers = request.headers
+    origin = headers.get("origin") or "-"
+    auth_header = headers.get("authorization")
+    logger.info(
+        "Expenses handler start | method=%s path=%s query=%s origin=%s auth_present=%s user_id=%s trace_id=%s",
+        request.method,
+        request.url.path,
+        request.url.query,
+        origin,
+        bool(auth_header),
+        getattr(current_user, "id", None),
+        trace_id,
+    )
+
+
+def _unexpected_error_response(request: Request, exc: Exception, trace_id: str) -> JSONResponse:
+    logger.error(
+        "Unexpected expenses error | method=%s path=%s trace_id=%s\n%s",
+        request.method,
+        request.url.path,
+        trace_id,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Internal server error",
+            "error_code": "expenses_unexpected_error",
+            "trace_id": trace_id,
+        },
+    )
+
+
 @router.get("", response_model=list[ExpenseOut], dependencies=[Depends(require_employee)])
 async def list_expenses(
     request: Request,
@@ -72,6 +107,8 @@ async def list_expenses(
     trace_id = getattr(request.state, "trace_id", None) or str(uuid.uuid4())
     request.state.trace_id = trace_id
     origin = request.headers.get("origin")
+
+    _log_request_entry(request, current_user, trace_id)
 
     try:
         start_dt, end_dt = _get_date_range(start_date, end_date)
@@ -91,6 +128,9 @@ async def list_expenses(
     except SQLAlchemyError as exc:
         _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
         return _handle_expense_db_error("Не удалось получить список расходов", exc, trace_id=trace_id)
+    except Exception as exc:  # pragma: no cover - defensive logging for unexpected errors
+        _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
+        return _unexpected_error_response(request, exc, trace_id)
 
     response_payload = [
         ExpenseOut.model_validate(
@@ -123,6 +163,8 @@ async def create_expense(
     request.state.trace_id = trace_id
     origin = request.headers.get("origin")
 
+    _log_request_entry(request, current_user, trace_id)
+
     try:
         branch_id = _resolve_branch_id(current_user, payload.branch_id)
         if branch_id is not None:
@@ -130,6 +172,14 @@ async def create_expense(
             if branch is None:
                 raise HTTPException(status_code=400, detail="Филиал не найден")
 
+        logger.debug(
+            "Expense creation prepared | title=%s amount=%s branch_id=%s user_id=%s trace_id=%s",
+            payload.title,
+            payload.amount,
+            branch_id,
+            current_user.id,
+            trace_id,
+        )
         expense = Expense(
             title=payload.title,
             amount=Decimal(str(payload.amount)),
@@ -137,8 +187,16 @@ async def create_expense(
             branch_id=branch_id,
         )
         db.add(expense)
+        logger.debug("Expense added to session | trace_id=%s", trace_id)
         db.commit()
+        logger.info("Expense committed | expense_id=%s trace_id=%s", expense.id, trace_id)
         db.refresh(expense)
+        logger.debug(
+            "Expense refreshed | expense_id=%s created_at=%s trace_id=%s",
+            expense.id,
+            expense.created_at,
+            trace_id,
+        )
     except HTTPException as exc:
         _log_expense_call(origin, request.method, exc.status_code, trace_id)
         raise
@@ -146,13 +204,21 @@ async def create_expense(
         db.rollback()
         _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
         return _handle_expense_db_error("Не удалось сохранить расход", exc, trace_id=trace_id)
+    except Exception as exc:  # pragma: no cover - defensive logging for unexpected errors
+        db.rollback()
+        _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
+        return _unexpected_error_response(request, exc, trace_id)
 
     _log_expense_call(origin, request.method, status.HTTP_201_CREATED, trace_id)
-    return ExpenseOut.model_validate(
+    response_payload = ExpenseOut.model_validate(
         expense,
         from_attributes=True,
         update={"created_by_name": current_user.name, "amount": float(expense.amount)},
     )
+    logger.info(
+        "Expense response prepared | expense_id=%s trace_id=%s", expense.id, trace_id
+    )
+    return response_payload
 
 
 @router.delete(
