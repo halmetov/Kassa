@@ -1,9 +1,11 @@
-from datetime import date, datetime, time, timezone
-from decimal import Decimal
+from __future__ import annotations
+
 import logging
 import uuid
+from datetime import date, datetime, time, timezone
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -41,8 +43,7 @@ def _resolve_branch_id(current_user: User, branch_id: int | None) -> int | None:
     return branch_id
 
 
-def _handle_expense_db_error(message: str, exc: SQLAlchemyError) -> JSONResponse:
-    trace_id = str(uuid.uuid4())
+def _handle_expense_db_error(message: str, exc: SQLAlchemyError, *, trace_id: str) -> JSONResponse:
     logger.exception("%s | trace_id=%s", message, trace_id, exc_info=exc)
     return JSONResponse(
         status_code=500,
@@ -50,13 +51,28 @@ def _handle_expense_db_error(message: str, exc: SQLAlchemyError) -> JSONResponse
     )
 
 
+def _log_expense_call(origin: str | None, method: str, status_code: int, trace_id: str) -> None:
+    logger.info(
+        "Expenses request | origin=%s method=%s status=%s trace_id=%s",
+        origin or "-",
+        method,
+        status_code,
+        trace_id,
+    )
+
+
 @router.get("", response_model=list[ExpenseOut], dependencies=[Depends(require_employee)])
 async def list_expenses(
+    request: Request,
     start_date: date | None = None,
     end_date: date | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    trace_id = getattr(request.state, "trace_id", None) or str(uuid.uuid4())
+    request.state.trace_id = trace_id
+    origin = request.headers.get("origin")
+
     try:
         start_dt, end_dt = _get_date_range(start_date, end_date)
         branch_id = _resolve_branch_id(current_user, None)
@@ -69,10 +85,14 @@ async def list_expenses(
         if branch_id is not None:
             query = query.where(Expense.branch_id == branch_id)
         expenses = db.execute(query).scalars().unique().all()
+    except HTTPException as exc:
+        _log_expense_call(origin, request.method, exc.status_code, trace_id)
+        raise
     except SQLAlchemyError as exc:
-        return _handle_expense_db_error("Не удалось получить список расходов", exc)
+        _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
+        return _handle_expense_db_error("Не удалось получить список расходов", exc, trace_id=trace_id)
 
-    return [
+    response_payload = [
         ExpenseOut.model_validate(
             expense,
             from_attributes=True,
@@ -83,6 +103,8 @@ async def list_expenses(
         )
         for expense in expenses
     ]
+    _log_expense_call(origin, request.method, status.HTTP_200_OK, trace_id)
+    return response_payload
 
 
 @router.post(
@@ -92,17 +114,22 @@ async def list_expenses(
     dependencies=[Depends(require_employee)],
 )
 async def create_expense(
+    request: Request,
     payload: ExpenseCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    branch_id = _resolve_branch_id(current_user, payload.branch_id)
-    if branch_id is not None:
-        branch = db.get(Branch, branch_id)
-        if branch is None:
-            raise HTTPException(status_code=400, detail="Филиал не найден")
+    trace_id = getattr(request.state, "trace_id", None) or str(uuid.uuid4())
+    request.state.trace_id = trace_id
+    origin = request.headers.get("origin")
 
     try:
+        branch_id = _resolve_branch_id(current_user, payload.branch_id)
+        if branch_id is not None:
+            branch = db.get(Branch, branch_id)
+            if branch is None:
+                raise HTTPException(status_code=400, detail="Филиал не найден")
+
         expense = Expense(
             title=payload.title,
             amount=Decimal(str(payload.amount)),
@@ -112,10 +139,15 @@ async def create_expense(
         db.add(expense)
         db.commit()
         db.refresh(expense)
+    except HTTPException as exc:
+        _log_expense_call(origin, request.method, exc.status_code, trace_id)
+        raise
     except SQLAlchemyError as exc:
         db.rollback()
-        return _handle_expense_db_error("Не удалось сохранить расход", exc)
+        _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
+        return _handle_expense_db_error("Не удалось сохранить расход", exc, trace_id=trace_id)
 
+    _log_expense_call(origin, request.method, status.HTTP_201_CREATED, trace_id)
     return ExpenseOut.model_validate(
         expense,
         from_attributes=True,
