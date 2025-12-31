@@ -96,6 +96,12 @@ def _unexpected_error_response(request: Request, exc: Exception, trace_id: str) 
     )
 
 
+@router.options("")
+async def expenses_preflight() -> JSONResponse:
+    """Explicit preflight responder to keep browsers happy on strict CORS setups."""
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "ok"})
+
+
 @router.get("", response_model=list[ExpenseOut], dependencies=[Depends(require_employee)])
 async def list_expenses(
     request: Request,
