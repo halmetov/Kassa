@@ -138,17 +138,17 @@ async def list_expenses(
         _log_expense_call(origin, request.method, status.HTTP_500_INTERNAL_SERVER_ERROR, trace_id)
         return _unexpected_error_response(request, exc, trace_id)
 
-    response_payload = [
-        ExpenseOut.model_validate(
-            expense,
-            from_attributes=True,
-            update={
-                "created_by_name": expense.created_by.name if expense.created_by else None,
-                "amount": float(expense.amount),
-            },
+    response_payload = []
+    for expense in expenses:
+        validated = ExpenseOut.model_validate(expense, from_attributes=True)
+        response_payload.append(
+            validated.model_copy(
+                update={
+                    "created_by_name": expense.created_by.name if expense.created_by else None,
+                    "amount": float(expense.amount),
+                }
+            )
         )
-        for expense in expenses
-    ]
     _log_expense_call(origin, request.method, status.HTTP_200_OK, trace_id)
     return response_payload
 
@@ -216,10 +216,9 @@ async def create_expense(
         return _unexpected_error_response(request, exc, trace_id)
 
     _log_expense_call(origin, request.method, status.HTTP_201_CREATED, trace_id)
-    response_payload = ExpenseOut.model_validate(
-        expense,
-        from_attributes=True,
-        update={"created_by_name": current_user.name, "amount": float(expense.amount)},
+    validated_expense = ExpenseOut.model_validate(expense, from_attributes=True)
+    response_payload = validated_expense.model_copy(
+        update={"created_by_name": current_user.name, "amount": float(expense.amount)}
     )
     logger.info(
         "Expense response prepared | expense_id=%s trace_id=%s", expense.id, trace_id
