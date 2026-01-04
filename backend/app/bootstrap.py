@@ -131,6 +131,7 @@ def ensure_default_branches(settings: Settings) -> None:
         settings.sale_branch_name or "Магазин",
         "Склад1",
         "Склад2",
+        "Цех",
     ]
     created = 0
     with _session_scope() as db:

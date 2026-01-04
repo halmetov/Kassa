@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal
 from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, text
@@ -10,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.enums import MovementStatus
 from app.database.base import Base
 from app.models.mixins import TimestampMixin
+from decimal import Decimal
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -154,6 +154,71 @@ class Expense(Base, TimestampMixin):
     branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
 
     created_by: Mapped["User"] = relationship("User")
+    branch: Mapped[Optional[Branch]] = relationship("Branch")
+
+
+class ProductionOrder(Base, TimestampMixin):
+    __tablename__ = "production_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="open", server_default=text("'open'"))
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+
+    created_by: Mapped[Optional["User"]] = relationship("User")
+    branch: Mapped[Optional[Branch]] = relationship("Branch")
+    materials: Mapped[List["ProductionOrderMaterial"]] = relationship(
+        "ProductionOrderMaterial", back_populates="order", cascade="all, delete-orphan"
+    )
+    payments: Mapped[List["ProductionOrderPayment"]] = relationship(
+        "ProductionOrderPayment", back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class ProductionOrderMaterial(Base, TimestampMixin):
+    __tablename__ = "production_order_materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("production_orders.id", ondelete="CASCADE"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+
+    order: Mapped[ProductionOrder] = relationship("ProductionOrder", back_populates="materials")
+    product: Mapped[Product] = relationship("Product")
+
+
+class ProductionOrderPayment(Base, TimestampMixin):
+    __tablename__ = "production_order_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("production_orders.id", ondelete="CASCADE"))
+    employee_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    order: Mapped[ProductionOrder] = relationship("ProductionOrder", back_populates="payments")
+    employee: Mapped["User"] = relationship("User")
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
+
+
+class ProductionExpense(Base, TimestampMixin):
+    __tablename__ = "production_expenses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    order_id: Mapped[Optional[int]] = mapped_column(ForeignKey("production_orders.id", ondelete="SET NULL"), nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"), nullable=True)
+
+    order: Mapped[Optional[ProductionOrder]] = relationship("ProductionOrder")
+    created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
     branch: Mapped[Optional[Branch]] = relationship("Branch")
 
 

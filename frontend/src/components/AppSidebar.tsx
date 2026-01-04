@@ -49,6 +49,13 @@ const menuItems = [
   { title: "Анализ", url: "/analysis", icon: BarChart3, adminOnly: true },
 ];
 
+const productionMenuItems = [
+  { title: "Заказы", url: "/production/orders", icon: FileText },
+  { title: "Склад (Цех)", url: "/production/stock", icon: Warehouse },
+  { title: "Приход (Цех)", url: "/production/income", icon: TrendingDown },
+  { title: "Производственные расходы", url: "/production/expenses", icon: HandCoins },
+];
+
 const systemItems = [
   { title: "Категории", url: "/categories", icon: Tags, adminOnly: false },
   { title: "Товары", url: "/products", icon: Package, adminOnly: false },
@@ -75,6 +82,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin' || isLoadingUser;
   const isEmployee = user?.role === 'employee';
+  const isProduction = user?.role === 'production_manager';
 
   const allowedForEmployee = [
     "/pos",
@@ -89,6 +97,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
   ];
   const visibleMenuItems = user
     ? menuItems.filter((item) => {
+        if (isProduction) return false;
         if (item.adminOnly && user.role !== "admin") return false;
         if (user.role === "employee") {
           return allowedForEmployee.includes(item.url);
@@ -131,7 +140,12 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
               <h2 className="text-lg font-bold text-sidebar-foreground">POS Система</h2>
               {user && (
                 <div className="text-sm text-sidebar-foreground/80">
-                  {user.name} • {user.role === "admin" ? "Администратор" : "Сотрудник"}
+                  {user.name} •
+                  {user.role === "admin"
+                    ? " Администратор"
+                    : user.role === "production_manager"
+                      ? " Менеджер производства"
+                      : " Сотрудник"}
                 </div>
               )}
             </div>
@@ -169,50 +183,77 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Collapsible defaultOpen={isSystemActive} className="group/collapsible">
+        {(isProduction || isAdmin) && (
           <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="hover:bg-sidebar-accent">
-                <Settings className="h-4 w-4" />
-                {open && (
-                  <>
-                    <span>Система</span>
-                    <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90 h-4 w-4" />
-                  </>
-                )}
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {systemItems
-                    .filter((item) => {
-                      if (item.adminOnly && !isAdmin) return false;
-                      if (isEmployee) {
-                        return ["/categories", "/products", "/clients"].includes(item.url);
-                      }
-                      return true;
-                    })
-                    .map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to={item.url}
-                            className="hover:bg-sidebar-accent"
-                            onClick={handleNavigate}
-                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          >
-                            <item.icon className="h-4 w-4" />
-                            {open && <span>{item.title}</span>}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
+            <SidebarGroupLabel>Производство</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {productionMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        className="hover:bg-sidebar-accent"
+                        onClick={handleNavigate}
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {open && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
           </SidebarGroup>
-        </Collapsible>
+        )}
+
+        {!isProduction && (
+          <Collapsible defaultOpen={isSystemActive} className="group/collapsible">
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="hover:bg-sidebar-accent">
+                  <Settings className="h-4 w-4" />
+                  {open && (
+                    <>
+                      <span>Система</span>
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90 h-4 w-4" />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {systemItems
+                      .filter((item) => {
+                        if (item.adminOnly && !isAdmin) return false;
+                        if (isEmployee) {
+                          return ["/categories", "/products", "/clients"].includes(item.url);
+                        }
+                        return true;
+                      })
+                      .map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to={item.url}
+                              className="hover:bg-sidebar-accent"
+                              onClick={handleNavigate}
+                              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            >
+                              <item.icon className="h-4 w-4" />
+                              {open && <span>{item.title}</span>}
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
 
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>

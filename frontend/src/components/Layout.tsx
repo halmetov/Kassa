@@ -30,6 +30,12 @@ export const Layout = () => {
     "/clients",
     "/reports",
   ];
+  const productionAllowedRoutes = [
+    "/production/orders",
+    "/production/expenses",
+    "/production/stock",
+    "/production/income",
+  ];
 
   const toggleSidebar = () => setMobileSidebarOpen((prev) => !prev);
   const closeSidebar = () => setMobileSidebarOpen(false);
@@ -71,6 +77,9 @@ export const Layout = () => {
   useEffect(() => {
     if (user?.role === "employee" && !employeeAllowedRoutes.includes(location.pathname)) {
       navigate("/pos", { replace: true });
+    }
+    if (user?.role === "production_manager" && !productionAllowedRoutes.includes(location.pathname)) {
+      navigate("/production/orders", { replace: true });
     }
   }, [location.pathname, navigate, user?.role]);
 

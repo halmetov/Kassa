@@ -25,6 +25,7 @@ from app.api import (
     routes_users,
     routes_debts,
     routes_expenses,
+    routes_production,
 )
 from app.bootstrap import bootstrap
 from app.core.config import get_settings
@@ -175,6 +176,7 @@ app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"
 app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])
 app.include_router(routes_debts.router, prefix="/api/debts", tags=["debts"])
 app.include_router(routes_expenses.router, prefix="/api/expenses", tags=["expenses"])
+app.include_router(routes_production.router, prefix="/api/production", tags=["production"])
 
 media_root = settings.media_root_path
 media_root.mkdir(parents=True, exist_ok=True)
