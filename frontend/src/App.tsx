@@ -19,6 +19,11 @@ import Analysis from "./pages/Analysis";
 import NotFound from "./pages/NotFound";
 import Movements from "./pages/Movements";
 import Expenses from "./pages/Expenses";
+import ProductionOrders from "./pages/ProductionOrders";
+import ProductionOrderDetail from "./pages/ProductionOrderDetail";
+import ProductionExpenses from "./pages/ProductionExpenses";
+import ProductionStock from "./pages/ProductionStock";
+import ProductionIncome from "./pages/ProductionIncome";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +44,11 @@ const App = () => (
             <Route path="/returns" element={<Returns />} />
             <Route path="/movements" element={<Movements />} />
             <Route path="/expenses" element={<Expenses />} />
+            <Route path="/production/orders" element={<ProductionOrders />} />
+            <Route path="/production/orders/:id" element={<ProductionOrderDetail />} />
+            <Route path="/production/expenses" element={<ProductionExpenses />} />
+            <Route path="/production/stock" element={<ProductionStock />} />
+            <Route path="/production/income" element={<ProductionIncome />} />
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/products" element={<Products />} />
