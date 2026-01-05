@@ -4,7 +4,7 @@ import time
 from contextlib import asynccontextmanager
 from pprint import pformat
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +28,7 @@ from app.api import (
     routes_production,
     routes_workshop,
 )
+from app.auth.security import reject_manager
 from app.bootstrap import bootstrap
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
@@ -163,21 +164,24 @@ app.user_middleware = sorted(
 app.middleware_stack = app.build_middleware_stack()
 
 app.include_router(routes_auth.router, prefix="/api/auth", tags=["auth"])
-app.include_router(routes_users.router, prefix="/api/users", tags=["users"])
-app.include_router(routes_categories.router, prefix="/api/categories", tags=["categories"])
-app.include_router(routes_products.router, prefix="/api/products", tags=["products"])
-app.include_router(routes_branches.router, prefix="/api/branches", tags=["branches"])
-app.include_router(routes_income.router, prefix="/api/income", tags=["income"])
-app.include_router(routes_sales.router, prefix="/api/sales", tags=["sales"])
-app.include_router(routes_clients.router, prefix="/api/clients", tags=["clients"])
-app.include_router(routes_pos.router, prefix="/api/pos", tags=["pos"])
-app.include_router(routes_cashier.router, prefix="/api/cashier", tags=["cashier"])
-app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"])
-app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"])
-app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"])
-app.include_router(routes_debts.router, prefix="/api/debts", tags=["debts"])
-app.include_router(routes_expenses.router, prefix="/api/expenses", tags=["expenses"])
-app.include_router(routes_production.router, prefix="/api/production", tags=["production"])
+manager_restricted = [Depends(reject_manager)]
+app.include_router(routes_users.router, prefix="/api/users", tags=["users"], dependencies=manager_restricted)
+app.include_router(routes_categories.router, prefix="/api/categories", tags=["categories"], dependencies=manager_restricted)
+app.include_router(routes_products.router, prefix="/api/products", tags=["products"], dependencies=manager_restricted)
+app.include_router(routes_branches.router, prefix="/api/branches", tags=["branches"], dependencies=manager_restricted)
+app.include_router(routes_income.router, prefix="/api/income", tags=["income"], dependencies=manager_restricted)
+app.include_router(routes_sales.router, prefix="/api/sales", tags=["sales"], dependencies=manager_restricted)
+app.include_router(routes_clients.router, prefix="/api/clients", tags=["clients"], dependencies=manager_restricted)
+app.include_router(routes_pos.router, prefix="/api/pos", tags=["pos"], dependencies=manager_restricted)
+app.include_router(routes_cashier.router, prefix="/api/cashier", tags=["cashier"], dependencies=manager_restricted)
+app.include_router(routes_reports.router, prefix="/api/reports", tags=["reports"], dependencies=manager_restricted)
+app.include_router(routes_returns.router, prefix="/api/returns", tags=["returns"], dependencies=manager_restricted)
+app.include_router(routes_movements.router, prefix="/api/movements", tags=["movements"], dependencies=manager_restricted)
+app.include_router(routes_debts.router, prefix="/api/debts", tags=["debts"], dependencies=manager_restricted)
+app.include_router(routes_expenses.router, prefix="/api/expenses", tags=["expenses"], dependencies=manager_restricted)
+app.include_router(
+    routes_production.router, prefix="/api/production", tags=["production"], dependencies=manager_restricted
+)
 app.include_router(routes_workshop.router, tags=["workshop"])
 
 media_root = settings.media_root_path

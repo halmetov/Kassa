@@ -150,7 +150,7 @@ def require_employee(current_user: User = Depends(get_current_user)) -> User:
 
 def require_production_access(current_user: User = Depends(get_current_user)) -> User:
     role_value = get_role_value(current_user.role)
-    if role_value not in {UserRole.ADMIN.value, UserRole.PRODUCTION_MANAGER.value, UserRole.MANAGER.value}:
+    if role_value not in {UserRole.ADMIN.value, UserRole.PRODUCTION_MANAGER.value}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user
 
@@ -158,6 +158,13 @@ def require_production_access(current_user: User = Depends(get_current_user)) ->
 def require_workshop_only(current_user: User = Depends(get_current_user)) -> User:
     role_value = get_role_value(current_user.role)
     if role_value not in {UserRole.ADMIN.value, UserRole.PRODUCTION_MANAGER.value, UserRole.MANAGER.value}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return current_user
+
+
+def reject_manager(current_user: User = Depends(get_current_user)) -> User:
+    role_value = get_role_value(current_user.role)
+    if role_value == UserRole.MANAGER.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     return current_user
 
