@@ -15,20 +15,31 @@ from app.services.inventory import adjust_stock
 router = APIRouter(redirect_slashes=False)
 
 
+def _get_or_create_workshop(db: Session) -> Branch:
+    workshop = db.query(Branch).filter(Branch.is_workshop.is_(True)).first()
+    if workshop:
+        return workshop
+    workshop = db.query(Branch).filter(Branch.name == "Цех").first()
+    if workshop:
+        workshop.is_workshop = True
+        db.commit()
+        db.refresh(workshop)
+        return workshop
+    workshop = Branch(name="Цех", active=True, is_workshop=True)
+    db.add(workshop)
+    db.commit()
+    db.refresh(workshop)
+    return workshop
+
+
 def _resolve_branch(branch_id: int | None, current_user: User, db: Session) -> int:
     role_value = current_user.role.value if hasattr(current_user.role, "value") else current_user.role
     if role_value == UserRole.EMPLOYEE.value:
         if current_user.branch_id is None:
             raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
         return current_user.branch_id
-    if role_value == UserRole.PRODUCTION_MANAGER.value:
-        workshop = db.query(Branch).filter(Branch.name == "Цех").first()
-        if not workshop:
-            workshop = Branch(name="Цех", active=True)
-            db.add(workshop)
-            db.commit()
-            db.refresh(workshop)
-        return workshop.id
+    if role_value in {UserRole.PRODUCTION_MANAGER.value, UserRole.MANAGER.value}:
+        return _get_or_create_workshop(db).id
     if branch_id is None:
         raise HTTPException(status_code=400, detail="Не указан филиал")
     return branch_id

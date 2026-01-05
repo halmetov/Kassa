@@ -82,6 +82,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
   const previousOpenMobile = useRef(openMobile);
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
+  const isProductionActive = productionMenuItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin' || isLoadingUser;
   const isEmployee = user?.role === 'employee';
   const isProduction = user?.role === 'production_manager' || user?.role === 'manager';
@@ -186,28 +187,45 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
         </SidebarGroup>
 
         {(isProduction || isAdmin) && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Производство</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {productionMenuItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to={item.url}
-                        className="hover:bg-sidebar-accent"
-                        onClick={handleNavigate}
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      >
-                        <item.icon className="h-4 w-4" />
-                        {open && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <Collapsible
+            defaultOpen={isProduction || isProductionActive}
+            className="group/collapsible"
+          >
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="hover:bg-sidebar-accent">
+                  <FileText className="h-4 w-4" />
+                  {open && (
+                    <>
+                      <span>Производство</span>
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90 h-4 w-4" />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {productionMenuItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to={item.url}
+                            className="hover:bg-sidebar-accent"
+                            onClick={handleNavigate}
+                            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          >
+                            <item.icon className="h-4 w-4" />
+                            {open && <span>{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         )}
 
         {!isProduction && (
