@@ -203,7 +203,7 @@ class ProductionOrderPayment(Base, TimestampMixin):
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     order: Mapped[ProductionOrder] = relationship("ProductionOrder", back_populates="payments")
-    employee: Mapped["User"] = relationship("User")
+    employee: Mapped["User"] = relationship("User", foreign_keys=[employee_id])
     created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
 
 
