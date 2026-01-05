@@ -31,10 +31,12 @@ export const Layout = () => {
     "/reports",
   ];
   const productionAllowedRoutes = [
-    "/production/orders",
-    "/production/expenses",
-    "/production/stock",
-    "/production/income",
+    "/workshop/orders",
+    "/workshop/expenses",
+    "/workshop/stock",
+    "/workshop/income",
+    "/workshop/employees",
+    "/workshop/report",
   ];
 
   const toggleSidebar = () => setMobileSidebarOpen((prev) => !prev);
@@ -78,8 +80,8 @@ export const Layout = () => {
     if (user?.role === "employee" && !employeeAllowedRoutes.includes(location.pathname)) {
       navigate("/pos", { replace: true });
     }
-    if (user?.role === "production_manager" && !productionAllowedRoutes.includes(location.pathname)) {
-      navigate("/production/orders", { replace: true });
+    if ((user?.role === "production_manager" || user?.role === "manager") && !productionAllowedRoutes.includes(location.pathname)) {
+      navigate("/workshop/orders", { replace: true });
     }
   }, [location.pathname, navigate, user?.role]);
 

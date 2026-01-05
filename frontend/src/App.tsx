@@ -19,11 +19,13 @@ import Analysis from "./pages/Analysis";
 import NotFound from "./pages/NotFound";
 import Movements from "./pages/Movements";
 import Expenses from "./pages/Expenses";
-import ProductionOrders from "./pages/ProductionOrders";
-import ProductionOrderDetail from "./pages/ProductionOrderDetail";
-import ProductionExpenses from "./pages/ProductionExpenses";
-import ProductionStock from "./pages/ProductionStock";
-import ProductionIncome from "./pages/ProductionIncome";
+import WorkshopOrders from "./pages/WorkshopOrders";
+import WorkshopOrderDetail from "./pages/WorkshopOrderDetail";
+import WorkshopEmployees from "./pages/WorkshopEmployees";
+import WorkshopStock from "./pages/WorkshopStock";
+import WorkshopIncome from "./pages/WorkshopIncome";
+import WorkshopExpenses from "./pages/WorkshopExpenses";
+import WorkshopReport from "./pages/WorkshopReport";
 
 const queryClient = new QueryClient();
 
@@ -44,11 +46,13 @@ const App = () => (
             <Route path="/returns" element={<Returns />} />
             <Route path="/movements" element={<Movements />} />
             <Route path="/expenses" element={<Expenses />} />
-            <Route path="/production/orders" element={<ProductionOrders />} />
-            <Route path="/production/orders/:id" element={<ProductionOrderDetail />} />
-            <Route path="/production/expenses" element={<ProductionExpenses />} />
-            <Route path="/production/stock" element={<ProductionStock />} />
-            <Route path="/production/income" element={<ProductionIncome />} />
+            <Route path="/workshop/orders" element={<WorkshopOrders />} />
+            <Route path="/workshop/orders/:id" element={<WorkshopOrderDetail />} />
+            <Route path="/workshop/expenses" element={<WorkshopExpenses />} />
+            <Route path="/workshop/stock" element={<WorkshopStock />} />
+            <Route path="/workshop/income" element={<WorkshopIncome />} />
+            <Route path="/workshop/employees" element={<WorkshopEmployees />} />
+            <Route path="/workshop/report" element={<WorkshopReport />} />
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/products" element={<Products />} />

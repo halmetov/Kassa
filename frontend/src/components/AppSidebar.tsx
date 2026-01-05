@@ -50,10 +50,12 @@ const menuItems = [
 ];
 
 const productionMenuItems = [
-  { title: "Заказы", url: "/production/orders", icon: FileText },
-  { title: "Склад (Цех)", url: "/production/stock", icon: Warehouse },
-  { title: "Приход (Цех)", url: "/production/income", icon: TrendingDown },
-  { title: "Производственные расходы", url: "/production/expenses", icon: HandCoins },
+  { title: "Заказы", url: "/workshop/orders", icon: FileText },
+  { title: "Склад (Цех)", url: "/workshop/stock", icon: Warehouse },
+  { title: "Приход (Цех)", url: "/workshop/income", icon: TrendingDown },
+  { title: "Производственные расходы", url: "/workshop/expenses", icon: HandCoins },
+  { title: "Сотрудники (Цех)", url: "/workshop/employees", icon: Users },
+  { title: "Отчет (Цех)", url: "/workshop/report", icon: FileText },
 ];
 
 const systemItems = [
@@ -82,7 +84,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isAdmin = user?.role === 'admin' || isLoadingUser;
   const isEmployee = user?.role === 'employee';
-  const isProduction = user?.role === 'production_manager';
+  const isProduction = user?.role === 'production_manager' || user?.role === 'manager';
 
   const allowedForEmployee = [
     "/pos",
@@ -143,7 +145,7 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
                   {user.name} •
                   {user.role === "admin"
                     ? " Администратор"
-                    : user.role === "production_manager"
+                    : user.role === "production_manager" || user.role === "manager"
                       ? " Менеджер производства"
                       : " Сотрудник"}
                 </div>
