@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "20240918_add_production"
-down_revision = None
+down_revision = "20240901_initial"
 branch_labels = None
 depends_on = None
 
@@ -21,15 +21,19 @@ production_status_enum = sa.Enum(name="production_status", *["open", "done"])
 
 
 def upgrade() -> None:
-    # Extend user role enum safely for PostgreSQL
-    op.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid WHERE t.typname = 'user_roles' AND e.enumlabel = 'production_manager') THEN
-            ALTER TYPE user_roles ADD VALUE 'production_manager';
-        END IF;
-    END$$;
-    """)
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        # Extend user role enum safely for PostgreSQL
+        op.execute(
+            """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid WHERE t.typname = 'user_roles' AND e.enumlabel = 'production_manager') THEN
+                ALTER TYPE user_roles ADD VALUE 'production_manager';
+            END IF;
+        END$$;
+        """
+        )
 
     op.create_table(
         "production_orders",
