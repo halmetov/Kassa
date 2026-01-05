@@ -55,6 +55,7 @@ class Branch(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255), unique=True)
     address: Mapped[Optional[str]] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_workshop: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
     stock_items: Mapped[List[Stock]] = relationship(back_populates="branch")
     users: Mapped[List["User"]] = relationship("User", back_populates="branch")
@@ -365,3 +366,85 @@ class Log(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     created_by: Mapped[Optional["User"]] = relationship("User", back_populates="logs")
+
+
+class WorkshopEmployee(Base, TimestampMixin):
+    __tablename__ = "workshop_employees"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    first_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    last_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    total_salary: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0")
+    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class WorkshopOrder(Base, TimestampMixin):
+    __tablename__ = "workshop_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="open", server_default=text("'open'"))
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
+
+    created_by_user: Mapped[Optional["User"]] = relationship("User")
+    branch: Mapped[Optional[Branch]] = relationship("Branch")
+    materials: Mapped[list["WorkshopOrderMaterial"]] = relationship(
+        "WorkshopOrderMaterial", back_populates="order", cascade="all, delete-orphan"
+    )
+    payouts: Mapped[list["WorkshopOrderPayout"]] = relationship(
+        "WorkshopOrderPayout", back_populates="order", cascade="all, delete-orphan"
+    )
+    closure: Mapped[Optional["WorkshopOrderClosure"]] = relationship(
+        "WorkshopOrderClosure", back_populates="order", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class WorkshopOrderMaterial(Base, TimestampMixin):
+    __tablename__ = "workshop_order_materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("workshop_orders.id", ondelete="CASCADE"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    order: Mapped[WorkshopOrder] = relationship("WorkshopOrder", back_populates="materials")
+    product: Mapped[Product] = relationship("Product")
+
+
+class WorkshopOrderPayout(Base, TimestampMixin):
+    __tablename__ = "workshop_order_payouts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("workshop_orders.id", ondelete="CASCADE"))
+    employee_id: Mapped[int] = mapped_column(ForeignKey("workshop_employees.id", ondelete="CASCADE"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    order: Mapped[WorkshopOrder] = relationship("WorkshopOrder", back_populates="payouts")
+    employee: Mapped[WorkshopEmployee] = relationship("WorkshopEmployee")
+
+
+class WorkshopOrderClosure(Base, TimestampMixin):
+    __tablename__ = "workshop_order_closures"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("workshop_orders.id", ondelete="CASCADE"), unique=True
+    )
+    order_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    paid_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    order: Mapped[WorkshopOrder] = relationship("WorkshopOrder", back_populates="closure")
+    closed_by_user: Mapped[Optional["User"]] = relationship("User")
