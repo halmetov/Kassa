@@ -39,6 +39,9 @@ export const Layout = () => {
     "/workshop/report",
   ];
 
+  const isPathAllowed = (path: string, allowed: string[]) =>
+    allowed.some((route) => path === route || path.startsWith(`${route}/`));
+
   const toggleSidebar = () => setMobileSidebarOpen((prev) => !prev);
   const closeSidebar = () => setMobileSidebarOpen(false);
 
@@ -80,7 +83,10 @@ export const Layout = () => {
     if (user?.role === "employee" && !employeeAllowedRoutes.includes(location.pathname)) {
       navigate("/pos", { replace: true });
     }
-    if ((user?.role === "production_manager" || user?.role === "manager") && !productionAllowedRoutes.includes(location.pathname)) {
+    if (
+      (user?.role === "production_manager" || user?.role === "manager") &&
+      !isPathAllowed(location.pathname, productionAllowedRoutes)
+    ) {
       navigate("/workshop/orders", { replace: true });
     }
   }, [location.pathname, navigate, user?.role]);
