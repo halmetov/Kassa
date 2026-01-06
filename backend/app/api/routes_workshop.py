@@ -5,13 +5,14 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import get_current_user, require_workshop_only
 from app.database.session import get_db
 from app.models import (
     Branch,
     Income,
+    Expense,
     IncomeItem,
     Product,
     Stock,
@@ -26,38 +27,78 @@ from app.schemas import branches as branch_schema
 from app.schemas import workshop as workshop_schema
 from app.services.files import save_upload
 from app.services.inventory import adjust_stock
+from app.services.workshop import get_workshop_branch_id
 
 router = APIRouter(prefix="/api/workshop", dependencies=[Depends(require_workshop_only)])
 
 
-WORKSHOP_NAME = "Цех"
-
-
 def _get_workshop_branch(db: Session) -> Branch:
-    branch = db.query(Branch).filter(Branch.is_workshop.is_(True)).first()
+    branch_id = get_workshop_branch_id(db)
+    branch = db.get(Branch, branch_id)
     if branch:
         return branch
-    branch = db.query(Branch).filter(Branch.name == WORKSHOP_NAME).first()
-    if branch:
-        branch.is_workshop = True
-        db.commit()
-        db.refresh(branch)
-        return branch
-    branch = Branch(name=WORKSHOP_NAME, active=True, is_workshop=True)
-    db.add(branch)
-    db.commit()
-    db.refresh(branch)
-    if not branch:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Workshop branch not found",
-        )
-    return branch
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Workshop branch not found",
+    )
 
 
 @router.get("/branch", response_model=branch_schema.Branch)
 def get_workshop_branch(db: Session = Depends(get_db)) -> Branch:
     return _get_workshop_branch(db)
+
+
+@router.get("/expenses", response_model=list[workshop_schema.WorkshopExpenseOut])
+def list_workshop_expenses(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    branch_id = get_workshop_branch_id(db)
+    query = (
+        db.query(Expense)
+        .options(joinedload(Expense.created_by))
+        .filter(Expense.branch_id == branch_id)
+    )
+    if start_date:
+        query = query.filter(Expense.created_at >= datetime.combine(start_date, datetime.min.time()))
+    if end_date:
+        query = query.filter(Expense.created_at <= datetime.combine(end_date, datetime.max.time()))
+    expenses = query.order_by(Expense.created_at.desc()).all()
+    results: list[workshop_schema.WorkshopExpenseOut] = []
+    for expense in expenses:
+        validated = workshop_schema.WorkshopExpenseOut.model_validate(expense, from_attributes=True)
+        results.append(
+            validated.model_copy(
+                update={"created_by_name": expense.created_by.name if expense.created_by else None}
+            )
+        )
+    return results
+
+
+@router.post(
+    "/expenses",
+    response_model=workshop_schema.WorkshopExpenseOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_workshop_expense(
+    payload: workshop_schema.WorkshopExpenseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    branch_id = get_workshop_branch_id(db)
+    expense = Expense(
+        title=payload.title.strip(),
+        amount=Decimal(str(payload.amount)),
+        created_by_id=current_user.id,
+        branch_id=branch_id,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    validated = workshop_schema.WorkshopExpenseOut.model_validate(expense, from_attributes=True)
+    return validated.model_copy(update={"created_by_name": current_user.name})
 
 
 @router.get("/employees", response_model=list[workshop_schema.WorkshopEmployeeOut])
