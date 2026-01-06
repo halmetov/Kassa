@@ -9,6 +9,7 @@ Create Date: 2024-09-30
 from __future__ import annotations
 
 from alembic import op
+from sqlalchemy import inspect
 import sqlalchemy as sa
 
 revision = "20240930_add_workshop_module"
@@ -22,6 +23,8 @@ user_roles_enum_name = "user_roles"
 
 def upgrade() -> None:
     bind = op.get_bind()
+    inspector = inspect(bind)
+
     if bind.dialect.name == "postgresql":
         op.execute(
             """
@@ -34,7 +37,12 @@ def upgrade() -> None:
         """
         )
 
-    op.add_column("branches", sa.Column("is_workshop", sa.Boolean(), server_default=sa.text("false"), nullable=False))
+    branch_columns = [column["name"] for column in inspector.get_columns("branches")]
+    if "is_workshop" not in branch_columns:
+        op.add_column(
+            "branches",
+            sa.Column("is_workshop", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        )
     op.execute("UPDATE branches SET is_workshop = true WHERE name = 'Цех'")
 
     op.create_table(
