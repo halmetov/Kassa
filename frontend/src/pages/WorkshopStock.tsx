@@ -8,7 +8,7 @@ import { toast } from "sonner";
 interface StockItem {
   product_id: number;
   name: string;
-  quantity: number;
+  available_qty: number;
   unit?: string;
   barcode?: string;
 }
@@ -19,7 +19,7 @@ export default function WorkshopStock() {
 
   const load = async () => {
     try {
-      const data = await apiGet<StockItem[]>(`/api/workshop/products${search ? `?search=${encodeURIComponent(search)}` : ""}`);
+      const data = await apiGet<StockItem[]>(`/api/workshop/stock/products${search ? `?q=${encodeURIComponent(search)}` : ""}`);
       setItems(data);
     } catch (error: any) {
       toast.error(error?.message || "Не удалось загрузить склад");
@@ -45,7 +45,7 @@ export default function WorkshopStock() {
             <div key={item.product_id} className="border p-2 rounded">
               <div className="font-semibold">{item.name}</div>
               <div className="text-sm text-muted-foreground">{item.barcode}</div>
-              <div className="text-sm">Остаток: {item.quantity} {item.unit}</div>
+              <div className="text-sm">Остаток: {item.available_qty} {item.unit}</div>
             </div>
           ))}
         </CardContent>

@@ -393,6 +393,10 @@ class WorkshopOrder(Base, TimestampMixin):
     created_by_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     branch_id: Mapped[Optional[int]] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
+    photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    paid_amount: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
 
     created_by_user: Mapped[Optional["User"]] = relationship("User")
     branch: Mapped[Optional[Branch]] = relationship("Branch")

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiPost } from "@/api/client";
+import { apiGet, apiPost, apiUpload } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,7 @@ export default function WorkshopOrders() {
   const [amount, setAmount] = useState("0");
   const [customer, setCustomer] = useState("");
   const [description, setDescription] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const navigate = useNavigate();
 
   const loadOrders = async () => {
@@ -41,17 +42,23 @@ export default function WorkshopOrders() {
   const createOrder = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      await apiPost("/api/workshop/orders", {
+      const order = await apiPost<WorkshopOrder>("/api/workshop/orders", {
         title,
         amount: Number(amount) || 0,
         customer_name: customer || undefined,
         description: description || undefined,
       });
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append("file", photoFile);
+        await apiUpload(`/api/workshop/orders/${order.id}/photo`, formData);
+      }
       toast.success("Заказ создан");
       setTitle("");
       setAmount("0");
       setCustomer("");
       setDescription("");
+      setPhotoFile(null);
       loadOrders();
     } catch (error: any) {
       toast.error(error?.message || "Не удалось создать заказ");
@@ -70,6 +77,11 @@ export default function WorkshopOrders() {
             <Input type="number" step="0.01" placeholder="Сумма" value={amount} onChange={(e) => setAmount(e.target.value)} />
             <Input placeholder="Заказчик" value={customer} onChange={(e) => setCustomer(e.target.value)} />
             <Textarea placeholder="Описание" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(event) => setPhotoFile(event.target.files?.[0] || null)}
+            />
             <Button type="submit">Создать</Button>
           </form>
         </CardContent>
