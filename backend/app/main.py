@@ -32,6 +32,7 @@ from app.auth.security import reject_manager
 from app.bootstrap import bootstrap
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.database.base import Base
 
 import app.models  # noqa: F401 - ensure models are imported for metadata
 
@@ -56,6 +57,9 @@ def log_startup_configuration() -> None:
         "Settings snapshot (safe):\n%s",
         pformat(settings.safe_settings_dump()),
     )
+    if settings.debug:
+        table_names = sorted(Base.metadata.tables)
+        logger.debug("SQLAlchemy metadata tables loaded: %s", ", ".join(table_names))
 
 
 def log_registered_routes(application: FastAPI) -> None:

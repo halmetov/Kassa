@@ -136,10 +136,12 @@ def ensure_default_branches(settings: Settings) -> None:
     created = 0
     with _session_scope() as db:
         for name in default_names:
-            exists = db.query(Branch).filter(Branch.name == name).first()
-            if exists:
+            branch = db.query(Branch).filter(Branch.name == name).first()
+            if branch:
+                if name == "Цех" and not branch.is_workshop:
+                    branch.is_workshop = True
                 continue
-            branch = Branch(name=name, active=True)
+            branch = Branch(name=name, active=True, is_workshop=name == "Цех")
             db.add(branch)
             created += 1
     if created:
