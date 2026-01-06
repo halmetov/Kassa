@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ProductionOrderBase(BaseModel):
@@ -55,8 +55,7 @@ class MaterialOut(BaseModel):
     unit_price: Optional[Decimal]
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaymentOut(BaseModel):
@@ -66,8 +65,7 @@ class PaymentOut(BaseModel):
     note: Optional[str]
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductionOrderOut(BaseModel):
@@ -83,8 +81,7 @@ class ProductionOrderOut(BaseModel):
     materials: list[MaterialOut] = []
     payments: list[PaymentOut] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductionExpenseOut(BaseModel):
@@ -96,5 +93,4 @@ class ProductionExpenseOut(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

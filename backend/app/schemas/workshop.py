@@ -4,7 +4,9 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+from pydantic.config import ConfigDict
+
 from app.schemas import income as income_schema
 
 
@@ -34,8 +36,29 @@ class WorkshopEmployeeOut(WorkshopEmployeeBase):
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkshopExpenseBase(BaseModel):
+    title: str
+    amount: Decimal = Field(default=Decimal("0"), ge=0)
+
+
+class WorkshopExpenseCreate(WorkshopExpenseBase):
+    pass
+
+
+class WorkshopExpenseOut(WorkshopExpenseBase):
+    id: int
+    branch_id: Optional[int] = None
+    created_at: Optional[datetime]
+    created_by_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal | float) -> float:
+        return float(value)
 
 
 class WorkshopOrderBase(BaseModel):
@@ -68,8 +91,39 @@ class WorkshopOrderOut(WorkshopOrderBase):
     closed_at: Optional[datetime]
     branch_id: Optional[int]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkshopMaterialCreate(BaseModel):
+    product_id: int
+    quantity: Decimal
+    unit: Optional[str] = None
+
+
+class WorkshopMaterialOut(BaseModel):
+    id: int
+    product_id: int
+    quantity: Decimal
+    unit: Optional[str]
+    created_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WorkshopPayoutCreate(BaseModel):
+    employee_id: int
+    amount: Decimal = Field(ge=0)
+    note: Optional[str] = None
+
+
+class WorkshopPayoutOut(BaseModel):
+    id: int
+    employee_id: int
+    amount: Decimal
+    note: Optional[str]
+    created_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkshopOrderMaterialDetail(WorkshopMaterialOut):
@@ -88,40 +142,6 @@ class WorkshopOrderDetail(WorkshopOrderOut):
     payouts: list[WorkshopOrderPayoutDetail] = []
 
 
-class WorkshopMaterialCreate(BaseModel):
-    product_id: int
-    quantity: Decimal
-    unit: Optional[str] = None
-
-
-class WorkshopMaterialOut(BaseModel):
-    id: int
-    product_id: int
-    quantity: Decimal
-    unit: Optional[str]
-    created_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
-class WorkshopPayoutCreate(BaseModel):
-    employee_id: int
-    amount: Decimal = Field(ge=0)
-    note: Optional[str] = None
-
-
-class WorkshopPayoutOut(BaseModel):
-    id: int
-    employee_id: int
-    amount: Decimal
-    note: Optional[str]
-    created_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
-
-
 class WorkshopClosePayload(BaseModel):
     paid_amount: Decimal = Field(ge=0)
     note: Optional[str] = None
@@ -136,8 +156,7 @@ class WorkshopClosureOut(BaseModel):
     closed_at: Optional[datetime]
     closed_by_user_id: Optional[int]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkshopReportFilter(BaseModel):
