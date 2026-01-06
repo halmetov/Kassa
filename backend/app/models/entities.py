@@ -375,6 +375,7 @@ class WorkshopEmployee(Base, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(120), nullable=True, default="")
     total_salary: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0")
     )

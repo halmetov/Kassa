@@ -22,6 +22,7 @@ from app.models import (
     WorkshopOrderMaterial,
     WorkshopOrderPayout,
 )
+from app.schemas import branches as branch_schema
 from app.schemas import workshop as workshop_schema
 from app.services.files import save_upload
 from app.services.inventory import adjust_stock
@@ -54,6 +55,11 @@ def _get_workshop_branch(db: Session) -> Branch:
     return branch
 
 
+@router.get("/branch", response_model=branch_schema.Branch)
+def get_workshop_branch(db: Session = Depends(get_db)) -> Branch:
+    return _get_workshop_branch(db)
+
+
 @router.get("/employees", response_model=list[workshop_schema.WorkshopEmployeeOut])
 def list_employees(search: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
     query = db.query(WorkshopEmployee)
@@ -63,6 +69,7 @@ def list_employees(search: Optional[str] = Query(None, alias="q"), db: Session =
             (WorkshopEmployee.first_name.ilike(term))
             | (WorkshopEmployee.last_name.ilike(term))
             | (WorkshopEmployee.phone.ilike(term))
+            | (WorkshopEmployee.position.ilike(term))
         )
     return query.order_by(WorkshopEmployee.id.desc()).all()
 
@@ -82,7 +89,7 @@ def update_employee(employee_id: int, payload: workshop_schema.WorkshopEmployeeU
     if not employee:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сотрудник не найден")
     for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(employee, field, value)
+        setattr(employee, field, value.strip() if isinstance(value, str) else value)
     db.commit()
     db.refresh(employee)
     return employee
@@ -107,6 +114,7 @@ def search_employees(q: Optional[str] = Query(None, alias="q"), db: Session = De
             (WorkshopEmployee.first_name.ilike(term))
             | (WorkshopEmployee.last_name.ilike(term))
             | (WorkshopEmployee.phone.ilike(term))
+            | (WorkshopEmployee.position.ilike(term))
         )
     employees = query.order_by(WorkshopEmployee.id.desc()).all()
     results: list[workshop_schema.WorkshopEmployeeSearchOut] = []
@@ -118,6 +126,7 @@ def search_employees(q: Optional[str] = Query(None, alias="q"), db: Session = De
                 full_name=full_name.strip() or employee.first_name,
                 phone=employee.phone,
                 salary_total=employee.total_salary,
+                position=employee.position,
             )
         )
     return results
@@ -162,14 +171,67 @@ def _get_order(db: Session, order_id: int) -> WorkshopOrder:
     return order
 
 
+def _serialize_order_detail(order: WorkshopOrder, db: Session) -> workshop_schema.WorkshopOrderDetail:
+    db.refresh(order, attribute_names=["materials", "payouts"])
+    material_rows: list[workshop_schema.WorkshopOrderMaterialDetail] = []
+    for material in order.materials:
+        product = db.get(Product, material.product_id)
+        material_rows.append(
+            workshop_schema.WorkshopOrderMaterialDetail(
+                id=material.id,
+                product_id=material.product_id,
+                quantity=material.quantity,
+                unit=material.unit,
+                created_at=material.created_at,
+                product_name=product.name if product else "",
+                product_barcode=product.barcode if product else None,
+            )
+        )
+    payout_rows: list[workshop_schema.WorkshopOrderPayoutDetail] = []
+    for payout in order.payouts:
+        employee = db.get(WorkshopEmployee, payout.employee_id)
+        full_name = " ".join(
+            filter(None, [employee.first_name if employee else None, employee.last_name if employee else None])
+        ).strip()
+        payout_rows.append(
+            workshop_schema.WorkshopOrderPayoutDetail(
+                id=payout.id,
+                employee_id=payout.employee_id,
+                amount=payout.amount,
+                note=payout.note,
+                created_at=payout.created_at,
+                employee_name=full_name or (employee.first_name if employee else ""),
+                employee_phone=employee.phone if employee else None,
+                employee_position=employee.position if employee else None,
+            )
+        )
+    return workshop_schema.WorkshopOrderDetail(
+        id=order.id,
+        title=order.title,
+        amount=order.amount,
+        customer_name=order.customer_name,
+        description=order.description,
+        status=order.status,
+        created_at=order.created_at,
+        updated_at=order.updated_at,
+        closed_at=order.closed_at,
+        branch_id=order.branch_id,
+        photo=order.photo,
+        paid_amount=order.paid_amount,
+        materials=material_rows,
+        payouts=payout_rows,
+    )
+
+
 def _assert_order_open(order: WorkshopOrder) -> None:
     if order.status == "closed":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order is closed")
 
 
-@router.get("/orders/{order_id}", response_model=workshop_schema.WorkshopOrderOut)
+@router.get("/orders/{order_id}", response_model=workshop_schema.WorkshopOrderDetail)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    return _get_order(db, order_id)
+    order = _get_order(db, order_id)
+    return _serialize_order_detail(order, db)
 
 
 @router.put("/orders/{order_id}", response_model=workshop_schema.WorkshopOrderOut)
@@ -183,6 +245,14 @@ def update_order(order_id: int, payload: workshop_schema.WorkshopOrderUpdate, db
     db.commit()
     db.refresh(order)
     return order
+
+
+@router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(order_id: int, db: Session = Depends(get_db)):
+    order = _get_order(db, order_id)
+    db.delete(order)
+    db.commit()
+    return None
 
 
 @router.post("/orders/{order_id}/photo", response_model=workshop_schema.WorkshopOrderOut)
@@ -320,6 +390,8 @@ def workshop_income_products(
             unit=product.unit,
             barcode=product.barcode,
             photo=product.photo or product.image_url,
+            purchase_price=product.purchase_price,
+            sale_price=product.sale_price,
         )
         for product in products
     ]
@@ -407,6 +479,8 @@ def _get_workshop_stock(search: Optional[str], db: Session) -> list[workshop_sch
                 unit=stock.product.unit if stock.product else None,
                 barcode=stock.product.barcode if stock.product else None,
                 photo=stock.product.photo or (stock.product.image_url if stock.product else None),
+                limit=stock.product.limit if stock.product else None,
+                purchase_price=stock.product.purchase_price if stock.product else None,
             )
         )
     return items

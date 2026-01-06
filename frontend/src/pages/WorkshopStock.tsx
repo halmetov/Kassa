@@ -1,55 +1,44 @@
-import { useEffect, useState } from "react";
 import { apiGet } from "@/api/client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { StockPageBase } from "@/components/StockPageBase";
 
-interface StockItem {
-  product_id: number;
-  name: string;
-  available_qty: number;
-  unit?: string;
-  barcode?: string;
-}
+type WorkshopBranch = { id: number; name: string };
 
 export default function WorkshopStock() {
-  const [items, setItems] = useState<StockItem[]>([]);
-  const [search, setSearch] = useState("");
-
-  const load = async () => {
-    try {
-      const data = await apiGet<StockItem[]>(`/api/workshop/stock/products${search ? `?q=${encodeURIComponent(search)}` : ""}`);
-      setItems(data);
-    } catch (error: any) {
-      toast.error(error?.message || "Не удалось загрузить склад");
-    }
+  const fetchBranch = async (): Promise<WorkshopBranch[]> => {
+    const branch = await apiGet<WorkshopBranch>("/api/workshop/branch");
+    return [branch];
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  const fetchStock = async (_branchId?: string) => {
+    const data = await apiGet<{ product_id: number; name: string; available_qty: number; limit?: number | null }[]>(
+      "/api/workshop/stock",
+    );
+    return data.map((item) => ({
+      id: item.product_id,
+      name: item.name,
+      quantity: item.available_qty as number,
+      limit: item.limit ?? null,
+      purchase_price: null,
+    }));
+  };
+
+  const fetchLowStock = async (_branchId?: string | null) => {
+    const branch = await apiGet<WorkshopBranch>("/api/workshop/branch");
+    const params = new URLSearchParams();
+    params.set("branch_id", String(branch.id));
+    return apiGet(`/api/products/low-stock?${params.toString()}`);
+  };
 
   return (
-    <div className="grid gap-4">
-      <div className="flex gap-2">
-        <Input placeholder="Поиск по названию или штрихкоду" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <Button onClick={load}>Поиск</Button>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Склад (Цех)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {items.map((item) => (
-            <div key={item.product_id} className="border p-2 rounded">
-              <div className="font-semibold">{item.name}</div>
-              <div className="text-sm text-muted-foreground">{item.barcode}</div>
-              <div className="text-sm">Остаток: {item.available_qty} {item.unit}</div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+    <StockPageBase
+      title="Склад (Цех)"
+      description="Остатки товаров в цехе"
+      branchSelector="fixed"
+      fetchBranches={fetchBranch}
+      fetchStock={fetchStock}
+      fetchLowStock={fetchLowStock}
+      fixedBranchId={undefined}
+      fixedBranchName="Цех"
+    />
   );
 }
