@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from app.schemas import income as income_schema
 
 
 class WorkshopEmployeeBase(BaseModel):
@@ -40,6 +41,9 @@ class WorkshopOrderBase(BaseModel):
     amount: Decimal = Field(default=Decimal("0"))
     customer_name: Optional[str] = None
     description: Optional[str] = None
+    status: Optional[str] = None
+    photo: Optional[str] = None
+    paid_amount: Optional[Decimal] = None
 
 
 class WorkshopOrderCreate(WorkshopOrderBase):
@@ -51,6 +55,7 @@ class WorkshopOrderUpdate(BaseModel):
     amount: Optional[Decimal] = None
     customer_name: Optional[str] = None
     description: Optional[str] = None
+    status: Optional[str] = None
 
 
 class WorkshopOrderOut(WorkshopOrderBase):
@@ -84,7 +89,7 @@ class WorkshopMaterialOut(BaseModel):
 
 class WorkshopPayoutCreate(BaseModel):
     employee_id: int
-    amount: Decimal
+    amount: Decimal = Field(ge=0)
     note: Optional[str] = None
 
 
@@ -100,7 +105,7 @@ class WorkshopPayoutOut(BaseModel):
 
 
 class WorkshopClosePayload(BaseModel):
-    paid_amount: Decimal
+    paid_amount: Decimal = Field(ge=0)
     note: Optional[str] = None
 
 
@@ -120,3 +125,49 @@ class WorkshopClosureOut(BaseModel):
 class WorkshopReportFilter(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+
+
+class WorkshopStockProduct(BaseModel):
+    product_id: int
+    name: str
+    available_qty: Decimal | float
+    unit: Optional[str] = None
+    barcode: Optional[str] = None
+    photo: Optional[str] = None
+
+
+class WorkshopEmployeeSearchOut(BaseModel):
+    id: int
+    full_name: str
+    phone: Optional[str] = None
+    salary_total: Decimal
+
+
+class WorkshopIncomeItem(BaseModel):
+    product_id: int
+    quantity: int
+    purchase_price: float
+    sale_price: float
+
+
+class WorkshopIncomeCreate(BaseModel):
+    items: list[WorkshopIncomeItem]
+
+
+class WorkshopIncomeStock(BaseModel):
+    product_id: int
+    branch_id: int
+    quantity: int | float
+
+
+class WorkshopIncomeResponse(BaseModel):
+    income: income_schema.Income
+    stock: list[WorkshopIncomeStock]
+
+
+class WorkshopIncomeProduct(BaseModel):
+    id: int
+    name: str
+    unit: Optional[str] = None
+    barcode: Optional[str] = None
+    photo: Optional[str] = None
