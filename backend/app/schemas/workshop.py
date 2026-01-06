@@ -12,6 +12,7 @@ class WorkshopEmployeeBase(BaseModel):
     first_name: str
     last_name: Optional[str] = None
     phone: Optional[str] = None
+    position: Optional[str] = Field(default=None, max_length=120)
     active: bool = True
 
 
@@ -23,6 +24,7 @@ class WorkshopEmployeeUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
+    position: Optional[str] = Field(default=None, max_length=120)
     active: Optional[bool] = None
 
 
@@ -68,6 +70,22 @@ class WorkshopOrderOut(WorkshopOrderBase):
 
     class Config:
         from_attributes = True
+
+
+class WorkshopOrderMaterialDetail(WorkshopMaterialOut):
+    product_name: str
+    product_barcode: Optional[str] = None
+
+
+class WorkshopOrderPayoutDetail(WorkshopPayoutOut):
+    employee_name: str
+    employee_phone: Optional[str] = None
+    employee_position: Optional[str] = None
+
+
+class WorkshopOrderDetail(WorkshopOrderOut):
+    materials: list[WorkshopOrderMaterialDetail] = []
+    payouts: list[WorkshopOrderPayoutDetail] = []
 
 
 class WorkshopMaterialCreate(BaseModel):
@@ -134,6 +152,8 @@ class WorkshopStockProduct(BaseModel):
     unit: Optional[str] = None
     barcode: Optional[str] = None
     photo: Optional[str] = None
+    limit: Optional[Decimal] = None
+    purchase_price: Optional[Decimal] = None
 
 
 class WorkshopEmployeeSearchOut(BaseModel):
@@ -141,6 +161,7 @@ class WorkshopEmployeeSearchOut(BaseModel):
     full_name: str
     phone: Optional[str] = None
     salary_total: Decimal
+    position: Optional[str] = None
 
 
 class WorkshopIncomeItem(BaseModel):
@@ -171,3 +192,5 @@ class WorkshopIncomeProduct(BaseModel):
     unit: Optional[str] = None
     barcode: Optional[str] = None
     photo: Optional[str] = None
+    purchase_price: Optional[Decimal] = None
+    sale_price: Optional[Decimal] = None

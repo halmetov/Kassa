@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { apiGet, apiPost, apiPut, apiUpload } from "@/api/client";
+import { useNavigate, useParams } from "react-router-dom";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,13 +11,19 @@ import { toast } from "sonner";
 interface Material {
   id: number;
   product_id: number;
+  product_name: string;
+  product_barcode?: string;
   quantity: number;
   unit?: string;
+  created_at?: string;
 }
 
 interface Payout {
   id: number;
   employee_id: number;
+  employee_name: string;
+  employee_phone?: string;
+  employee_position?: string;
   amount: number;
   note?: string;
   created_at?: string;
@@ -50,10 +56,12 @@ interface EmployeeOption {
   full_name: string;
   phone?: string;
   salary_total: number;
+  position?: string;
 }
 
 export default function WorkshopOrderDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const orderId = Number(id);
   const [order, setOrder] = useState<Order | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
@@ -73,9 +81,7 @@ export default function WorkshopOrderDetail() {
   const load = async () => {
     try {
       const data = await apiGet<Order>(`/api/workshop/orders/${orderId}`);
-      const materials = await apiGet<Material[]>(`/api/workshop/orders/${orderId}/materials`);
-      const payouts = await apiGet<Payout[]>(`/api/workshop/orders/${orderId}/payouts`);
-      setOrder({ ...data, materials, payouts });
+      setOrder(data);
       setPaidAmount(data.paid_amount != null ? String(data.paid_amount) : "0");
     } catch (error: any) {
       toast.error(error?.message || "Не удалось загрузить заказ");
@@ -95,9 +101,7 @@ export default function WorkshopOrderDetail() {
     }
     const handle = setTimeout(async () => {
       try {
-        const data = await apiGet<StockProduct[]>(
-          `/api/workshop/stock/products?q=${encodeURIComponent(materialSearch)}`,
-        );
+        const data = await apiGet<StockProduct[]>(`/api/workshop/stock/products?q=${encodeURIComponent(materialSearch)}`);
         setMaterialOptions(data);
       } catch (error: any) {
         toast.error(error?.message || "Не удалось загрузить материалы");
@@ -113,9 +117,7 @@ export default function WorkshopOrderDetail() {
     }
     const handle = setTimeout(async () => {
       try {
-        const data = await apiGet<EmployeeOption[]>(
-          `/api/workshop/employees/search?q=${encodeURIComponent(employeeSearch)}`,
-        );
+        const data = await apiGet<EmployeeOption[]>(`/api/workshop/employees/search?q=${encodeURIComponent(employeeSearch)}`);
         setEmployeeOptions(data);
       } catch (error: any) {
         toast.error(error?.message || "Не удалось найти сотрудников");
@@ -223,6 +225,19 @@ export default function WorkshopOrderDetail() {
     }
   };
 
+  const deleteOrder = async () => {
+    if (!orderId) return;
+    const confirmed = window.confirm("Точно удалить заказ?");
+    if (!confirmed) return;
+    try {
+      await apiDelete(`/api/workshop/orders/${orderId}`);
+      toast.success("Заказ удален");
+      navigate("/workshop/orders");
+    } catch (error: any) {
+      toast.error(error?.message || "Не удалось удалить заказ");
+    }
+  };
+
   if (!order) return <div>Загрузка...</div>;
 
   const isClosed = order.status === "closed";
@@ -267,14 +282,17 @@ export default function WorkshopOrderDetail() {
           {order.photo && (
             <img src={order.photo} alt="Фото заказа" className="max-h-64 rounded border" />
           )}
-          {!isClosed && (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
-              <Button variant="secondary" onClick={uploadPhoto} disabled={!photoFile}>
-                Загрузить фото
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+              disabled={isClosed}
+            />
+            <Button variant="secondary" onClick={uploadPhoto} disabled={!photoFile || isClosed}>
+              Загрузить фото
+            </Button>
+          </div>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={updateOrder} disabled={isClosed}>
               Сохранить
@@ -290,6 +308,9 @@ export default function WorkshopOrderDetail() {
                 Завершить заказ
               </Button>
             )}
+            <Button variant="destructive" onClick={deleteOrder}>
+              Удалить заказ
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -300,52 +321,53 @@ export default function WorkshopOrderDetail() {
             <CardTitle>Материалы</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!isClosed && (
-              <form className="space-y-2" onSubmit={addMaterial}>
-                <Input
-                  placeholder="Поиск материала"
-                  value={materialSearch}
-                  onChange={(e) => setMaterialSearch(e.target.value)}
-                  required
-                />
-                {materialOptions.length > 0 && (
-                  <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
-                    {materialOptions.map((option) => (
-                      <div
-                        key={option.product_id}
-                        className="cursor-pointer p-2 rounded hover:bg-muted"
-                        onClick={() => {
-                          setSelectedMaterial(option);
-                          setMaterialSearch(option.name);
-                          setMaterialOptions([]);
-                        }}
-                      >
-                        <div className="font-semibold">{option.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Остаток: {option.available_qty} {option.unit} {option.barcode ? ` • ${option.barcode}` : ""}
-                        </div>
+            <form className="space-y-2" onSubmit={addMaterial}>
+              <Input
+                placeholder="Поиск материала"
+                value={materialSearch}
+                onChange={(e) => setMaterialSearch(e.target.value)}
+                required
+                disabled={isClosed}
+              />
+              {materialOptions.length > 0 && (
+                <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
+                  {materialOptions.map((option) => (
+                    <div
+                      key={option.product_id}
+                      className="cursor-pointer p-2 rounded hover:bg-muted"
+                      onClick={() => {
+                        setSelectedMaterial(option);
+                        setMaterialSearch(option.name);
+                        setMaterialOptions([]);
+                      }}
+                    >
+                      <div className="font-semibold">{option.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Остаток: {option.available_qty} {option.unit} {option.barcode ? ` • ${option.barcode}` : ""}
                       </div>
-                    ))}
-                  </div>
-                )}
-                <Input
-                  placeholder="Количество"
-                  value={materialQty}
-                  type="number"
-                  step="0.01"
-                  min={0.01}
-                  onChange={(e) => setMaterialQty(e.target.value)}
-                  required
-                />
-                <Button type="submit" disabled={!selectedMaterial}>
-                  Добавить материал
-                </Button>
-              </form>
-            )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Input
+                placeholder="Количество"
+                value={materialQty}
+                type="number"
+                step="0.01"
+                min={0.01}
+                onChange={(e) => setMaterialQty(e.target.value)}
+                required
+                disabled={isClosed}
+              />
+              <Button type="submit" disabled={!selectedMaterial || isClosed}>
+                Добавить материал
+              </Button>
+            </form>
             <div className="space-y-2">
               {order.materials?.map((material) => (
                 <div key={material.id} className="border p-2 rounded text-sm">
-                  Товар #{material.product_id} • {material.quantity} {material.unit || ""}
+                  {material.product_name} ({material.product_id}) • {material.quantity} {material.unit || ""}
+                  {material.product_barcode ? ` • ${material.product_barcode}` : ""}
                 </div>
               ))}
             </div>
@@ -357,50 +379,69 @@ export default function WorkshopOrderDetail() {
             <CardTitle>Выплаты</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!isClosed && (
-              <form className="space-y-2" onSubmit={addPayout}>
-                <Input
-                  placeholder="Сотрудник"
-                  value={employeeSearch}
-                  onChange={(e) => setEmployeeSearch(e.target.value)}
-                  required
-                />
-                {employeeOptions.length > 0 && (
-                  <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
-                    {employeeOptions.map((employee) => (
-                      <div
-                        key={employee.id}
-                        className="cursor-pointer p-2 rounded hover:bg-muted"
-                        onClick={() => {
-                          setSelectedEmployee(employee);
-                          setEmployeeSearch(employee.full_name);
-                          setEmployeeOptions([]);
-                        }}
-                      >
-                        <div className="font-semibold">{employee.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{employee.phone}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Input
-                  placeholder="Сумма"
-                  value={paymentAmount}
-                  type="number"
-                  step="0.01"
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                />
-                <Textarea placeholder="Заметка" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} />
-                <Button type="submit" disabled={!selectedEmployee}>
-                  Добавить выплату
-                </Button>
-              </form>
-            )}
+            <form className="space-y-2" onSubmit={addPayout}>
+              <Input
+                placeholder="Сотрудник"
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+                required
+                disabled={isClosed}
+              />
+              {employeeOptions.length > 0 && (
+                <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
+                  {employeeOptions.map((employee) => (
+                    <div
+                      key={employee.id}
+                      className="cursor-pointer p-2 rounded hover:bg-muted"
+                      onClick={() => {
+                        setSelectedEmployee(employee);
+                        setEmployeeSearch(employee.full_name);
+                        setEmployeeOptions([]);
+                      }}
+                    >
+                      <div className="font-semibold">{employee.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{employee.phone}</div>
+                      {employee.position && (
+                        <div className="text-xs text-muted-foreground">{employee.position}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Input
+                placeholder="Сумма"
+                value={paymentAmount}
+                type="number"
+                step="0.01"
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                disabled={isClosed}
+              />
+              <Textarea
+                placeholder="Заметка"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                disabled={isClosed}
+              />
+              <Button type="submit" disabled={!selectedEmployee || isClosed}>
+                Добавить выплату
+              </Button>
+            </form>
             <div className="space-y-2">
               {order.payouts?.map((payment) => (
-                <div key={payment.id} className="border p-2 rounded text-sm">
-                  Сотрудник #{payment.employee_id} • {payment.amount} •
-                  {payment.created_at ? ` ${new Date(payment.created_at).toLocaleDateString()}` : ""}
+                <div key={payment.id} className="border p-2 rounded text-sm space-y-1">
+                  <div className="font-medium">
+                    {payment.employee_name} ({payment.employee_id})
+                  </div>
+                  <div>Сумма: {payment.amount}</div>
+                  {payment.employee_position && (
+                    <div className="text-muted-foreground text-xs">{payment.employee_position}</div>
+                  )}
+                  {payment.created_at && (
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(payment.created_at).toLocaleDateString()}
+                    </div>
+                  )}
+                  {payment.note && <div className="text-xs">{payment.note}</div>}
                 </div>
               ))}
             </div>
