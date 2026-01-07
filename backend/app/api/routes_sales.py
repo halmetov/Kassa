@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.auth.security import get_current_user
 from app.core.config import get_settings
 from app.database.session import get_db
-from app.models.entities import Branch, Client, Debt, DebtPayment, Product, Return, Sale, SaleItem, Stock
+from app.models.entities import Branch, Client, Debt, DebtPayment, Product, Return, Sale, SaleItem
 from app.models.user import User
 from app.schemas import sales as sales_schema
 from app.services.returns import calculate_return_breakdowns
@@ -162,7 +162,9 @@ async def list_sales(
 
     for payment in debt_payments:
         cash_amount = float(payment.amount) if payment.payment_type == "cash" else 0.0
-        card_amount = float(payment.amount) if payment.payment_type != "cash" else 0.0
+        card_amount = (
+            float(payment.amount) if payment.payment_type not in {"cash", "offset"} else 0.0
+        )
         summaries.append(
             sales_schema.SaleSummary(
                 id=payment.id,
@@ -222,22 +224,12 @@ async def create_sale(
             product = db.get(Product, item.product_id)
             if not product:
                 raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-            stock = db.execute(
-                select(Stock).where(Stock.branch_id == branch_id, Stock.product_id == item.product_id)
-            ).scalar_one_or_none()
-            available_qty = stock.quantity if stock else 0
-            if available_qty < item.quantity:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Недостаточно товара '{product.name}'. Доступно: {available_qty}, запрошено: {item.quantity}",
-                )
-
             price = Decimal(str(item.price))
             discount = Decimal(str(item.discount))
             quantity = Decimal(item.quantity)
             line_total = (price - discount) * quantity
-            adjust_stock(db, branch_id, item.product_id, -item.quantity)
-            product.quantity = max(product.quantity - item.quantity, 0)
+            adjust_stock(db, branch_id, item.product_id, -item.quantity, allow_negative=True)
+            product.quantity -= item.quantity
 
             sale_item = SaleItem(
                 sale_id=sale.id,

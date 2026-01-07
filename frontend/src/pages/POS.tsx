@@ -173,7 +173,7 @@ export default function POS() {
           const available_qty = matched?.available_qty ?? item.available_qty;
           const parsedInput = parseQuantityInput(item.quantityInput ?? item.quantity);
           const numeric = parsedInput ?? item.quantity ?? MIN_QUANTITY;
-          const safeQty = Math.max(MIN_QUANTITY, Math.min(numeric, available_qty));
+          const safeQty = Math.max(MIN_QUANTITY, numeric);
           return {
             ...item,
             available_qty,
@@ -244,24 +244,16 @@ export default function POS() {
   };
 
   const addToCart = (product: Product) => {
-    if (product.available_qty <= 0) {
-      toast.error("Товар недоступен на складе магазина");
-      return;
-    }
     const existingItem = cart.find((item) => item.product_id === product.id);
     if (existingItem) {
-      if (existingItem.quantity + 1 > product.available_qty) {
-        toast.error(`Не хватает. Доступно: ${product.available_qty}`);
-        return;
-      }
       setCart(
         cart.map((item) =>
           item.product_id === product.id
             ? {
                 ...item,
-                quantity: Math.min(item.quantity + 1, product.available_qty),
-                quantityInput: formatQuantityInput(Math.min(item.quantity + 1, product.available_qty)),
-                total: Math.min(item.quantity + 1, product.available_qty) * item.price,
+                quantity: item.quantity + 1,
+                quantityInput: formatQuantityInput(item.quantity + 1),
+                total: (item.quantity + 1) * item.price,
               }
             : item,
         ),
@@ -287,11 +279,7 @@ export default function POS() {
       cart.map((item) => {
         if (item.product_id === product_id) {
           const desired = item.quantity + delta;
-          const normalized = Math.max(MIN_QUANTITY, desired);
-          const newQty = Math.min(normalized, item.available_qty);
-          if (normalized > item.available_qty) {
-            toast.error(`Не хватает. Доступно: ${item.available_qty}`);
-          }
+          const newQty = Math.max(MIN_QUANTITY, desired);
           return {
             ...item,
             quantity: newQty,
@@ -310,7 +298,7 @@ export default function POS() {
         if (item.product_id !== product_id) return item;
         const sanitized = raw.replace(/[^0-9]/g, "");
         const parsed = sanitized === "" ? null : parseInt(sanitized, 10);
-        const safeQty = parsed === null ? 0 : Math.min(parsed, item.available_qty);
+        const safeQty = parsed === null ? 0 : Math.max(parsed, MIN_QUANTITY);
         return {
           ...item,
           quantity: safeQty,
@@ -326,8 +314,7 @@ export default function POS() {
       prev.map((item) => {
         if (item.product_id !== product_id) return item;
         const parsed = parseQuantityInput(item.quantityInput ?? item.quantity);
-        const normalized = parsed === null || parsed < MIN_QUANTITY ? MIN_QUANTITY : parsed;
-        const clamped = Math.min(normalized, item.available_qty);
+        const clamped = parsed === null || parsed < MIN_QUANTITY ? MIN_QUANTITY : parsed;
         return {
           ...item,
           quantity: clamped,
@@ -372,7 +359,6 @@ export default function POS() {
   };
 
   const getTotalAmount = () => cart.reduce((sum, item) => sum + item.total, 0);
-  const hasInsufficient = useMemo(() => cart.some((item) => item.quantity > item.available_qty), [cart]);
 
   const handlePayment = async () => {
     if (!user) {
@@ -399,12 +385,6 @@ export default function POS() {
     if (credit > 0 && !selectedClient) {
       toast.error("Для продажи в долг выберите клиента");
       return;
-    }
-    for (const item of cart) {
-      if (item.quantity > item.available_qty) {
-        toast.error(`Не хватает. Доступно: ${item.available_qty}`);
-        return;
-      }
     }
     try {
       let paymentType = "cash";
@@ -682,12 +662,7 @@ export default function POS() {
                     onChange={(e) => handleManualQuantityChange(item.product_id, e.target.value)}
                     onFocus={() => handleQuantityFocus(item.product_id)}
                     onBlur={() => handleQuantityBlur(item.product_id)}
-                    className={cn(
-                      "w-16 text-center",
-                      item.quantity > item.available_qty
-                        ? "border-destructive focus-visible:ring-destructive"
-                        : undefined,
-                    )}
+                    className="w-16 text-center"
                   />
                   <Button
                     size="icon"
@@ -698,9 +673,6 @@ export default function POS() {
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground">Доступно: {item.available_qty}</div>
-                {item.quantity > item.available_qty && (
-                  <div className="text-xs text-destructive font-medium">Не хватает на складе магазина</div>
-                )}
 
                 <div className="flex gap-2">
                   <Input
@@ -722,15 +694,11 @@ export default function POS() {
             <span>Итого:</span>
             <span>{getTotalAmount().toFixed(2)} ₸</span>
           </div>
-          {hasInsufficient && (
-            <div className="text-sm text-destructive">Количество превышает остаток. Обновите позиции.</div>
-          )}
-
           <Button
             className="w-full"
             size="lg"
             onClick={() => setShowPaymentModal(true)}
-            disabled={cart.length === 0 || hasInsufficient}
+            disabled={cart.length === 0}
           >
             Оплата
           </Button>
@@ -846,7 +814,7 @@ export default function POS() {
             <Button variant="outline" onClick={() => setShowPaymentModal(false)}>
               Отмена
             </Button>
-            <Button onClick={handlePayment} disabled={hasInsufficient}>
+            <Button onClick={handlePayment}>
               Подтвердить
             </Button>
           </DialogFooter>

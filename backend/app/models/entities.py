@@ -308,6 +308,10 @@ class Return(Base, TimestampMixin):
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id"))
     type: Mapped[str] = mapped_column(Enum("by_receipt", "by_item", name="return_type"))
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    apply_to_debt: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    debt_offset_amount: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
     sale: Mapped[Sale] = relationship(back_populates="returns")

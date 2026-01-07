@@ -123,11 +123,17 @@ async def get_summary(
             ),
             func.coalesce(
                 func.sum(
-                    case((DebtPayment.payment_type != "cash", DebtPayment.amount), else_=0)
+                    case(
+                        (DebtPayment.payment_type.notin_(["cash", "offset"]), DebtPayment.amount),
+                        else_=0,
+                    )
                 ),
                 0,
             ),
-            func.coalesce(func.sum(DebtPayment.amount), 0),
+            func.coalesce(
+                func.sum(case((DebtPayment.payment_type != "offset", DebtPayment.amount), else_=0)),
+                0,
+            ),
         ).where(*debt_filters)
     ).one()
 
@@ -265,6 +271,7 @@ async def get_operations_summary(
     debt_query = _apply_date_filters(debt_query, start_date, end_date, DebtPayment.created_at)
     for row in db.execute(debt_query):
         amount = float(row[3] or 0)
+        is_offset = row[2] == "offset"
         operations.append(
             report_schema.SaleSummary(
                 id=row[0],
@@ -275,7 +282,7 @@ async def get_operations_summary(
                 total_amount=amount,
                 payment_type=row[2],
                 paid_cash=amount if row[2] == "cash" else 0,
-                paid_card=amount if row[2] != "cash" else 0,
+                paid_card=0 if is_offset else (amount if row[2] != "cash" else 0),
                 paid_debt=0,
             )
         )
@@ -291,13 +298,15 @@ async def get_operations_summary(
         if op_date not in by_day_map:
             by_day_map[op_date] = report_schema.DailyReport(day=op_date, total_sales=0, total_credit=0)
         by_day = by_day_map[op_date]
-        by_day.total_sales += op.total_amount
-        by_day.total_credit += op.paid_debt
+        if not (op.entry_type == "debt_payment" and op.payment_type == "offset"):
+            by_day.total_sales += op.total_amount
+            by_day.total_credit += op.paid_debt
 
-        if op.seller:
-            by_seller_map[op.seller] = by_seller_map.get(op.seller, 0) + op.total_amount
-        if op.branch:
-            by_branch_map[op.branch] = by_branch_map.get(op.branch, 0) + op.total_amount
+        if not (op.entry_type == "debt_payment" and op.payment_type == "offset"):
+            if op.seller:
+                by_seller_map[op.seller] = by_seller_map.get(op.seller, 0) + op.total_amount
+            if op.branch:
+                by_branch_map[op.branch] = by_branch_map.get(op.branch, 0) + op.total_amount
 
     by_day = list(by_day_map.values())
     by_day.sort(key=lambda entry: entry.day)
@@ -391,7 +400,10 @@ async def get_analytics(
             ),
             func.coalesce(
                 func.sum(
-                    case((DebtPayment.payment_type != "cash", DebtPayment.amount), else_=0)
+                    case(
+                        (DebtPayment.payment_type.notin_(["cash", "offset"]), DebtPayment.amount),
+                        else_=0,
+                    )
                 ),
                 0,
             ),
@@ -440,7 +452,9 @@ async def get_analytics(
     debt_by_day_rows = db.execute(
         select(
             func.date(DebtPayment.created_at),
-            func.sum(DebtPayment.amount),
+            func.sum(
+                case((DebtPayment.payment_type != "offset", DebtPayment.amount), else_=0)
+            ),
         )
         .where(*debt_filters)
         .group_by(func.date(DebtPayment.created_at))
