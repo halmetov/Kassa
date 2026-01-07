@@ -165,14 +165,17 @@ class WorkshopReportFilter(BaseModel):
 
 
 class WorkshopStockProduct(BaseModel):
+    id: int
     product_id: int
     name: str
-    available_qty: Decimal | float
+    quantity: Decimal | float
+    available_qty: Decimal | float | None = None
     unit: Optional[str] = None
     barcode: Optional[str] = None
     photo: Optional[str] = None
-    limit: Optional[Decimal] = None
-    purchase_price: Optional[Decimal] = None
+    image_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkshopEmployeeSearchOut(BaseModel):

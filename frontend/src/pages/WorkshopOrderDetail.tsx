@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 
 interface Material {
@@ -44,11 +46,14 @@ interface Order {
 }
 
 interface StockProduct {
-  product_id: number;
+  id: number;
+  product_id?: number;
   name: string;
-  available_qty: number;
+  quantity: number;
   unit?: string;
   barcode?: string;
+  photo?: string | null;
+  image_url?: string | null;
 }
 
 interface EmployeeOption {
@@ -65,10 +70,12 @@ export default function WorkshopOrderDetail() {
   const orderId = Number(id);
   const [order, setOrder] = useState<Order | null>(null);
   const [materialSearch, setMaterialSearch] = useState("");
+  const [materialOpen, setMaterialOpen] = useState(false);
   const [materialOptions, setMaterialOptions] = useState<StockProduct[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<StockProduct | null>(null);
   const [materialQty, setMaterialQty] = useState("1");
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeOpen, setEmployeeOpen] = useState(false);
   const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeOption | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("0");
@@ -95,36 +102,34 @@ export default function WorkshopOrderDetail() {
   }, [orderId]);
 
   useEffect(() => {
-    if (!materialSearch || materialSearch.length < 2) {
-      setMaterialOptions([]);
-      return;
-    }
+    if (!materialOpen) return;
     const handle = setTimeout(async () => {
       try {
-        const data = await apiGet<StockProduct[]>(`/api/workshop/stock/products?q=${encodeURIComponent(materialSearch)}`);
+        const params = new URLSearchParams();
+        if (materialSearch) params.set("q", materialSearch);
+        const data = await apiGet<StockProduct[]>(`/api/workshop/stock/products?${params.toString()}`);
         setMaterialOptions(data);
       } catch (error: any) {
         toast.error(error?.message || "Не удалось загрузить материалы");
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [materialSearch]);
+  }, [materialSearch, materialOpen]);
 
   useEffect(() => {
-    if (!employeeSearch || employeeSearch.length < 2) {
-      setEmployeeOptions([]);
-      return;
-    }
+    if (!employeeOpen) return;
     const handle = setTimeout(async () => {
       try {
-        const data = await apiGet<EmployeeOption[]>(`/api/workshop/employees/search?q=${encodeURIComponent(employeeSearch)}`);
+        const params = new URLSearchParams();
+        if (employeeSearch) params.set("q", employeeSearch);
+        const data = await apiGet<EmployeeOption[]>(`/api/workshop/employees/search?${params.toString()}`);
         setEmployeeOptions(data);
       } catch (error: any) {
         toast.error(error?.message || "Не удалось найти сотрудников");
       }
     }, 300);
     return () => clearTimeout(handle);
-  }, [employeeSearch]);
+  }, [employeeSearch, employeeOpen]);
 
   const handleClosedState = (error: any) => {
     toast.error(error?.message || "Ошибка запроса");
@@ -141,7 +146,7 @@ export default function WorkshopOrderDetail() {
     }
     try {
       await apiPost(`/api/workshop/orders/${orderId}/materials`, {
-        product_id: selectedMaterial.product_id,
+        product_id: selectedMaterial.id || selectedMaterial.product_id,
         quantity: Number(materialQty) || 0,
         unit: selectedMaterial.unit,
       });
@@ -322,33 +327,54 @@ export default function WorkshopOrderDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             <form className="space-y-2" onSubmit={addMaterial}>
-              <Input
-                placeholder="Поиск материала"
-                value={materialSearch}
-                onChange={(e) => setMaterialSearch(e.target.value)}
-                required
-                disabled={isClosed}
-              />
-              {materialOptions.length > 0 && (
-                <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
-                  {materialOptions.map((option) => (
-                    <div
-                      key={option.product_id}
-                      className="cursor-pointer p-2 rounded hover:bg-muted"
-                      onClick={() => {
-                        setSelectedMaterial(option);
-                        setMaterialSearch(option.name);
-                        setMaterialOptions([]);
-                      }}
-                    >
-                      <div className="font-semibold">{option.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Остаток: {option.available_qty} {option.unit} {option.barcode ? ` • ${option.barcode}` : ""}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Popover open={materialOpen} onOpenChange={(open) => setMaterialOpen(open && !isClosed)}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    disabled={isClosed}
+                    onClick={() => {
+                      setMaterialOpen(!materialOpen);
+                      setMaterialSearch("");
+                    }}
+                  >
+                    {selectedMaterial ? selectedMaterial.name : "Выберите материал"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[360px]" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Поиск по названию или штрихкоду"
+                      value={materialSearch}
+                      onValueChange={setMaterialSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Ничего не найдено</CommandEmpty>
+                      <CommandGroup>
+                        {materialOptions.map((option) => (
+                          <CommandItem
+                            key={option.id || option.product_id}
+                            onSelect={() => {
+                              setSelectedMaterial(option);
+                              setMaterialSearch(option.name);
+                              setMaterialOpen(false);
+                            }}
+                            className="flex flex-col items-start gap-1"
+                          >
+                            <div className="font-semibold">{option.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Остаток: {option.quantity} {option.unit || ""}
+                              {option.barcode ? ` • ${option.barcode}` : ""}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <Input
                 placeholder="Количество"
                 value={materialQty}
@@ -380,34 +406,54 @@ export default function WorkshopOrderDetail() {
           </CardHeader>
           <CardContent className="space-y-3">
             <form className="space-y-2" onSubmit={addPayout}>
-              <Input
-                placeholder="Сотрудник"
-                value={employeeSearch}
-                onChange={(e) => setEmployeeSearch(e.target.value)}
-                required
-                disabled={isClosed}
-              />
-              {employeeOptions.length > 0 && (
-                <div className="border rounded p-2 space-y-1 max-h-40 overflow-y-auto">
-                  {employeeOptions.map((employee) => (
-                    <div
-                      key={employee.id}
-                      className="cursor-pointer p-2 rounded hover:bg-muted"
-                      onClick={() => {
-                        setSelectedEmployee(employee);
-                        setEmployeeSearch(employee.full_name);
-                        setEmployeeOptions([]);
-                      }}
-                    >
-                      <div className="font-semibold">{employee.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{employee.phone}</div>
-                      {employee.position && (
-                        <div className="text-xs text-muted-foreground">{employee.position}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Popover open={employeeOpen} onOpenChange={(open) => setEmployeeOpen(open && !isClosed)}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                    disabled={isClosed}
+                    onClick={() => {
+                      setEmployeeOpen(!employeeOpen);
+                      setEmployeeSearch("");
+                    }}
+                  >
+                    {selectedEmployee ? selectedEmployee.full_name : "Выберите сотрудника"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-[340px]" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Поиск по имени, позиции или телефону"
+                      value={employeeSearch}
+                      onValueChange={setEmployeeSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Ничего не найдено</CommandEmpty>
+                      <CommandGroup>
+                        {employeeOptions.map((employee) => (
+                          <CommandItem
+                            key={employee.id}
+                            onSelect={() => {
+                              setSelectedEmployee(employee);
+                              setEmployeeSearch(employee.full_name);
+                              setEmployeeOpen(false);
+                            }}
+                            className="flex flex-col items-start gap-1"
+                          >
+                            <div className="font-semibold">{employee.full_name}</div>
+                            {employee.position && (
+                              <div className="text-xs text-muted-foreground">{employee.position}</div>
+                            )}
+                            {employee.phone && <div className="text-xs text-muted-foreground">{employee.phone}</div>}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <Input
                 placeholder="Сумма"
                 value={paymentAmount}

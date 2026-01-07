@@ -26,8 +26,10 @@ export default function WorkshopEmployees() {
 
   const load = async () => {
     try {
-      const params = search ? `?q=${encodeURIComponent(search)}` : "";
-      const data = await apiGet<Employee[]>(`/api/workshop/employees${params}`);
+      const params = new URLSearchParams();
+      if (search) params.set("q", search);
+      params.set("limit", "200");
+      const data = await apiGet<Employee[]>(`/api/workshop/employees?${params.toString()}`);
       setEmployees(data);
       const positions: Record<number, string> = {};
       data.forEach((employee) => {
