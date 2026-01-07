@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, date
+import logging
 from decimal import Decimal
 from typing import Optional
 
@@ -30,6 +31,7 @@ from app.services.inventory import adjust_stock
 from app.services.workshop import get_workshop_branch_id
 
 router = APIRouter(prefix="/api/workshop", dependencies=[Depends(require_workshop_only)])
+logger = logging.getLogger(__name__)
 
 
 def _get_workshop_branch(db: Session) -> Branch:
@@ -102,7 +104,14 @@ def create_workshop_expense(
 
 
 @router.get("/employees", response_model=list[workshop_schema.WorkshopEmployeeOut])
-def list_employees(search: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
+def list_employees(
+    request: Request,
+    search: Optional[str] = Query(None, alias="q"),
+    limit: int = Query(20, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _log_request(request, current_user)
     query = db.query(WorkshopEmployee)
     if search:
         term = f"%{search}%"
@@ -112,7 +121,7 @@ def list_employees(search: Optional[str] = Query(None, alias="q"), db: Session =
             | (WorkshopEmployee.phone.ilike(term))
             | (WorkshopEmployee.position.ilike(term))
         )
-    return query.order_by(WorkshopEmployee.id.desc()).all()
+    return query.order_by(WorkshopEmployee.id.desc()).limit(limit).all()
 
 
 @router.post("/employees", response_model=workshop_schema.WorkshopEmployeeOut, status_code=status.HTTP_201_CREATED)
@@ -147,7 +156,14 @@ def delete_employee(employee_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/employees/search", response_model=list[workshop_schema.WorkshopEmployeeSearchOut])
-def search_employees(q: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
+def search_employees(
+    request: Request,
+    q: Optional[str] = Query(None, alias="q"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _log_request(request, current_user)
     query = db.query(WorkshopEmployee).filter(WorkshopEmployee.active.is_(True))
     if q:
         term = f"%{q}%"
@@ -157,7 +173,7 @@ def search_employees(q: Optional[str] = Query(None, alias="q"), db: Session = De
             | (WorkshopEmployee.phone.ilike(term))
             | (WorkshopEmployee.position.ilike(term))
         )
-    employees = query.order_by(WorkshopEmployee.id.desc()).all()
+    employees = query.order_by(WorkshopEmployee.id.desc()).limit(limit).all()
     results: list[workshop_schema.WorkshopEmployeeSearchOut] = []
     for employee in employees:
         full_name = " ".join(filter(None, [employee.first_name, employee.last_name]))
@@ -501,42 +517,89 @@ def report(
     return query.order_by(WorkshopOrderClosure.closed_at.desc()).all()
 
 
-def _get_workshop_stock(search: Optional[str], db: Session) -> list[workshop_schema.WorkshopStockProduct]:
+def _log_request(request: Request, current_user: User | None) -> None:
+    trace_id = getattr(request.state, "trace_id", None)
+    logger.info(
+        "[workshop] %s %s | query=%s | origin=%s | user_id=%s | trace_id=%s",
+        request.method,
+        request.url.path,
+        request.url.query,
+        request.headers.get("origin"),
+        current_user.id if current_user else None,
+        trace_id,
+    )
+
+
+def _get_workshop_stock(
+    search: Optional[str],
+    limit: int,
+    db: Session,
+) -> list[workshop_schema.WorkshopStockProduct]:
     branch = _get_workshop_branch(db)
-    query = db.query(Stock).join(Stock.product).filter(Stock.branch_id == branch.id)
+    query = (
+        db.query(Stock)
+        .join(Product, Stock.product_id == Product.id)
+        .filter(Stock.branch_id == branch.id, Stock.quantity > 0)
+    )
     if search:
         term = f"%{search}%"
-        query = query.filter(
-            (Stock.product.has())
-            & ((Stock.product.name.ilike(term)) | (Stock.product.barcode.ilike(term)))
-        )
+        query = query.filter((Product.name.ilike(term)) | (Product.barcode.ilike(term)))
+    stock_rows = query.order_by(Product.name.asc()).limit(limit).all()
+
     items: list[workshop_schema.WorkshopStockProduct] = []
-    for stock in query.all():
-        items.append(
-            workshop_schema.WorkshopStockProduct(
-                product_id=stock.product_id,
-                name=stock.product.name if stock.product else "",
-                available_qty=stock.quantity,
-                unit=stock.product.unit if stock.product else None,
-                barcode=stock.product.barcode if stock.product else None,
-                photo=stock.product.photo or (stock.product.image_url if stock.product else None),
-                limit=stock.product.limit if stock.product else None,
-                purchase_price=stock.product.purchase_price if stock.product else None,
-            )
+    for stock in stock_rows:
+        product = stock.product
+        if not product:
+            continue
+        validated = workshop_schema.WorkshopStockProduct.model_validate(
+            {
+                "id": product.id,
+                "product_id": product.id,
+                "name": product.name,
+                "barcode": product.barcode,
+                "unit": product.unit,
+                "quantity": stock.quantity,
+                "available_qty": stock.quantity,
+                "photo": product.photo,
+                "image_url": product.image_url,
+            },
+            from_attributes=True,
         )
+        items.append(validated)
     return items
 
 
 @router.get("/stock/products", response_model=list[workshop_schema.WorkshopStockProduct])
-def workshop_stock_products(search: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
-    return _get_workshop_stock(search, db)
+def workshop_stock_products(
+    request: Request,
+    search: Optional[str] = Query(None, alias="q"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _log_request(request, current_user)
+    return _get_workshop_stock(search, limit, db)
 
 
 @router.get("/products", response_model=list[workshop_schema.WorkshopStockProduct])
-def workshop_products(search: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
-    return _get_workshop_stock(search, db)
+def workshop_products(
+    request: Request,
+    search: Optional[str] = Query(None, alias="q"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _log_request(request, current_user)
+    return _get_workshop_stock(search, limit, db)
 
 
 @router.get("/stock", response_model=list[workshop_schema.WorkshopStockProduct])
-def workshop_stock(search: Optional[str] = Query(None, alias="q"), db: Session = Depends(get_db)):
-    return _get_workshop_stock(search, db)
+def workshop_stock(
+    request: Request,
+    search: Optional[str] = Query(None, alias="q"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _log_request(request, current_user)
+    return _get_workshop_stock(search, limit, db)
