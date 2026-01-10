@@ -40,6 +40,7 @@ class Product(Base, TimestampMixin):
     purchase_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
     sale_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
     wholesale_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0, server_default=text("0"))
+    red_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True, default=None)
     limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0, server_default=text("0"))
     rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0, server_default=text("0"))
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
