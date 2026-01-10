@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -136,7 +136,10 @@ export const Layout = () => {
 
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
-      <div className="min-h-screen flex w-full bg-background">
+      <div
+        className="min-h-screen flex w-full bg-background"
+        style={{ "--navbar-height": "3.5rem" } as CSSProperties}
+      >
         {(open || mobileSidebarOpen) && (
           <div
             className={`${mobileSidebarOpen ? "block" : "hidden md:block"} ${
@@ -160,7 +163,7 @@ export const Layout = () => {
           />
         )}
         <main className="flex-1 flex flex-col">
-          <header className="h-14 border-b bg-card flex items-center px-4 lg:px-6">
+          <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-card flex items-center px-4 lg:px-6">
             <Button
               variant="ghost"
               size="icon"
@@ -181,7 +184,7 @@ export const Layout = () => {
               <Menu className="h-5 w-5" />
             </Button>
           </header>
-          <div className="flex-1 p-4 lg:p-6">
+          <div className="flex-1 p-4 lg:p-6 pt-[calc(var(--navbar-height)+1rem)] lg:pt-[calc(var(--navbar-height)+1.5rem)]">
             <Outlet context={{ user, isAdmin }} />
           </div>
         </main>

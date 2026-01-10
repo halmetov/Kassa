@@ -39,6 +39,7 @@ interface Product {
   purchase_price: number;
   sale_price: number;
   wholesale_price: number;
+  red_price?: number | null;
   limit: number;
   quantity: number;
   image_url?: string | null;
@@ -65,11 +66,12 @@ export default function Products() {
     purchase_price: "0",
     sale_price: "0",
     wholesale_price: "0",
+    red_price: "",
     limit: "0",
     rating: "0",
   });
 
-  const [editData, setEditData] = useState<any>({ rating: "0" });
+  const [editData, setEditData] = useState<any>({ rating: "0", red_price: "" });
 
   useEffect(() => {
     fetchProducts();
@@ -110,6 +112,7 @@ export default function Products() {
       purchase_price: parseFloat(formData.purchase_price) || 0,
       sale_price: parseFloat(formData.sale_price) || 0,
       wholesale_price: parseFloat(formData.wholesale_price) || 0,
+      red_price: formData.red_price.trim() ? parseFloat(formData.red_price) : null,
       limit: parseInt(formData.limit) || 0,
       rating: Math.max(0, parseInt(formData.rating, 10) || 0),
     };
@@ -143,6 +146,7 @@ export default function Products() {
       purchase_price: "0",
       sale_price: "0",
       wholesale_price: "0",
+      red_price: "",
       limit: "0",
       rating: "0",
     });
@@ -160,6 +164,7 @@ export default function Products() {
       purchase_price: product.purchase_price.toString(),
       sale_price: product.sale_price.toString(),
       wholesale_price: product.wholesale_price.toString(),
+      red_price: product.red_price !== null && product.red_price !== undefined ? product.red_price.toString() : "",
       limit: (product.limit ?? 0).toString(),
       rating: (product.rating ?? 0).toString(),
     });
@@ -177,6 +182,7 @@ export default function Products() {
         purchase_price: parseFloat(editData.purchase_price) || 0,
         sale_price: parseFloat(editData.sale_price) || 0,
         wholesale_price: parseFloat(editData.wholesale_price) || 0,
+        red_price: editData.red_price?.trim() ? parseFloat(editData.red_price) : null,
         limit: parseInt(editData.limit) || 0,
         rating: Math.max(0, parseInt(editData.rating, 10) || 0),
       });
@@ -206,6 +212,7 @@ export default function Products() {
               purchase_price: parseFloat(editData.purchase_price) || 0,
               sale_price: parseFloat(editData.sale_price) || 0,
               wholesale_price: parseFloat(editData.wholesale_price) || 0,
+              red_price: editData.red_price?.trim() ? parseFloat(editData.red_price) : null,
               limit: parseInt(editData.limit) || 0,
               rating: Math.max(0, parseInt(editData.rating, 10) || 0),
             }
@@ -340,6 +347,15 @@ export default function Products() {
               type="number"
               value={formData.wholesale_price}
               onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>Красная цена</Label>
+            <Input
+              type="number"
+              value={formData.red_price}
+              onChange={(e) => setFormData({ ...formData, red_price: e.target.value })}
+              placeholder="Необязательно"
             />
           </div>
           <div>
@@ -486,6 +502,12 @@ export default function Products() {
                   <div><span className="text-muted-foreground">Цена прихода:</span> {selectedProduct.purchase_price} ₸</div>
                   <div><span className="text-muted-foreground">Цена продажи:</span> {selectedProduct.sale_price} ₸</div>
                   <div><span className="text-muted-foreground">Цена оптом:</span> {selectedProduct.wholesale_price} ₸</div>
+                  <div>
+                    <span className="text-muted-foreground">Красная цена:</span>{" "}
+                    {selectedProduct.red_price !== null && selectedProduct.red_price !== undefined
+                      ? `${selectedProduct.red_price.toFixed(2)} ₸`
+                      : "-"}
+                  </div>
                   <div><span className="text-muted-foreground">Лимит:</span> {selectedProduct.limit ?? 0}</div>
                   <div><span className="text-muted-foreground">Рейтинг:</span> {selectedProduct.rating ?? 0}</div>
                   <div><span className="text-muted-foreground">Доступно:</span> {selectedProduct.quantity}</div>
@@ -555,6 +577,15 @@ export default function Products() {
                       type="number"
                       value={editData.wholesale_price}
                       onChange={(e) => setEditData({ ...editData, wholesale_price: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Красная цена</Label>
+                    <Input
+                      type="number"
+                      value={editData.red_price}
+                      onChange={(e) => setEditData({ ...editData, red_price: e.target.value })}
+                      placeholder="Необязательно"
                     />
                   </div>
                   <div>
