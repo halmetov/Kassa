@@ -45,6 +45,7 @@ const menuItems = [
   { title: "Касса", url: "/pos", icon: ShoppingCart },
   { title: "Возврат", url: "/returns", icon: RotateCcw },
   { title: "Отчет", url: "/reports", icon: FileText },
+  { title: "Отчет по прибыли", url: "/reports/profit", icon: FileText, adminOnly: true },
   { title: "Расход", url: "/expenses", icon: HandCoins, adminOnly: true },
   { title: "Анализ", url: "/analysis", icon: BarChart3, adminOnly: true },
 ];

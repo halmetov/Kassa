@@ -1,13 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import date, datetime, time, timedelta
+from calendar import monthrange
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.auth.security import get_current_user
+from app.auth.security import get_current_user, require_admin
 from app.core.enums import UserRole
 from app.database.session import get_db
-from app.models.entities import Branch, Client, Debt, DebtPayment, Product, Return, Sale, SaleItem, User
+from app.models.entities import (
+    Branch,
+    Client,
+    Debt,
+    DebtPayment,
+    Expense,
+    Product,
+    Return,
+    ReturnItem,
+    Sale,
+    SaleItem,
+    User,
+)
 from app.schemas import reports as report_schema
 from app.services.returns import calculate_return_breakdowns
 
@@ -34,11 +47,7 @@ def _resolve_report_scope(
         if seller_id is not None and seller_id != current_user.id:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         effective_seller_id = current_user.id
-
-        if branch_id is None:
-            effective_branch_id = current_user.branch_id
-        elif current_user.branch_id is not None and branch_id != current_user.branch_id:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        effective_branch_id = None
 
     return effective_seller_id, effective_branch_id
 
@@ -56,6 +65,7 @@ async def get_summary(
     end_date: date | None = None,
     branch_id: int | None = None,
     seller_id: int | None = None,
+    user_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -68,6 +78,8 @@ async def get_summary(
     start_dt = datetime.combine(start_date, time.min)
     end_dt = datetime.combine(end_date, time.max)
 
+    if seller_id is None and user_id is not None:
+        seller_id = user_id
     seller_id, branch_id = _resolve_report_scope(current_user, seller_id, branch_id)
 
     sale_filters = [Sale.created_at >= start_dt, Sale.created_at <= end_dt]
@@ -161,17 +173,109 @@ async def get_summary(
 
     grand_total = cash_sales_net + card_sales_net + debts_created_amount + debt_payments_amount - float(refunds_debt)
 
+    returns_total = -float(refunds_total or 0)
+    cashbox_total = float(cash_total or 0) + float(card_total or 0) + debt_payments_amount + returns_total
+
     return report_schema.SummaryResponse(
         start_date=start_date,
         end_date=end_date,
-        cash_total=cash_total_value,
-        card_total=card_total_value,
+        cash_total=float(cash_total or 0),
+        card_total=float(card_total or 0),
+        debt_payments_total=debt_payments_amount,
+        returns_total=returns_total,
+        new_debts_total=debts_created_amount,
+        cashbox_total=cashbox_total,
         debts_created_amount=debts_created_amount,
         debt_payments_amount=debt_payments_amount,
         refunds_total=float(refunds_total or 0),
         sales_total=sales_total_value,
         grand_total=grand_total,
         total_debt_all_clients=float(total_debt_all_clients or 0),
+    )
+
+
+@router.get(
+    "/profit",
+    response_model=report_schema.ProfitReportResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def get_profit_report(
+    month: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        period_start = datetime.strptime(month, "%Y-%m").date()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid month format. Use YYYY-MM.") from exc
+
+    _, last_day = monthrange(period_start.year, period_start.month)
+    period_end = date(period_start.year, period_start.month, last_day)
+    start_dt = datetime.combine(period_start, time.min)
+    end_dt = datetime.combine(period_end, time.max)
+
+    sales_total = db.execute(
+        select(func.coalesce(func.sum(Sale.total_amount), 0)).where(
+            Sale.created_at >= start_dt,
+            Sale.created_at <= end_dt,
+        )
+    ).scalar_one()
+
+    return_entries = db.execute(
+        select(Return)
+        .options(selectinload(Return.items), joinedload(Return.sale))
+        .where(Return.created_at >= start_dt, Return.created_at <= end_dt)
+    ).scalars().unique().all()
+    return_breakdowns = calculate_return_breakdowns(return_entries)
+    refunds_total = sum(b.total for b in return_breakdowns.values())
+
+    sales_total_value = float(sales_total or 0) - float(refunds_total or 0)
+
+    sales_cogs = db.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    SaleItem.quantity * func.coalesce(Product.purchase_price, 0)
+                ),
+                0,
+            )
+        )
+        .join(Sale, SaleItem.sale_id == Sale.id)
+        .join(Product, SaleItem.product_id == Product.id)
+        .where(Sale.created_at >= start_dt, Sale.created_at <= end_dt)
+    ).scalar_one()
+
+    returns_cogs = db.execute(
+        select(
+            func.coalesce(
+                func.sum(
+                    ReturnItem.quantity * func.coalesce(Product.purchase_price, 0)
+                ),
+                0,
+            )
+        )
+        .join(Return, ReturnItem.return_id == Return.id)
+        .join(SaleItem, ReturnItem.sale_item_id == SaleItem.id)
+        .join(Product, SaleItem.product_id == Product.id)
+        .where(Return.created_at >= start_dt, Return.created_at <= end_dt)
+    ).scalar_one()
+
+    cogs_total = float(sales_cogs or 0) - float(returns_cogs or 0)
+
+    expenses_total = db.execute(
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.created_at >= start_dt,
+            Expense.created_at <= end_dt,
+        )
+    ).scalar_one()
+
+    profit_total = sales_total_value - cogs_total - float(expenses_total or 0)
+
+    return report_schema.ProfitReportResponse(
+        month=month,
+        sales_total=sales_total_value,
+        cogs_total=cogs_total,
+        expenses_total=float(expenses_total or 0),
+        profit=profit_total,
     )
 
 

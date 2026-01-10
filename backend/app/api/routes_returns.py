@@ -29,9 +29,7 @@ def _apply_date_filters(
 
 def _enforce_scope(query, current_user: User):
     if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        query = query.where(Return.branch_id == current_user.branch_id)
+        query = query.where(Return.created_by_id == current_user.id)
     return query
 
 
@@ -44,11 +42,6 @@ def _get_sale_for_return(db: Session, sale_id: int, current_user: User) -> Sale:
     ).scalar_one_or_none()
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
-    if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        if sale.branch_id != current_user.branch_id:
-            raise HTTPException(status_code=403, detail="Нет доступа к этому чеку")
     return sale
 
 
@@ -274,7 +267,7 @@ async def get_return_detail(
     ).scalars().unique().one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Возврат не найден")
-    if current_user.role == "employee" and current_user.branch_id != entry.branch_id:
+    if current_user.role == "employee" and entry.created_by_id != current_user.id:
         raise HTTPException(status_code=403, detail="Нет доступа к возврату")
 
     items: list[return_schema.ReturnItem] = []
