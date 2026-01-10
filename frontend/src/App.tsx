@@ -16,6 +16,7 @@ import Warehouse from "./pages/Warehouse";
 import Reports from "./pages/Reports";
 import Returns from "./pages/Returns";
 import Analysis from "./pages/Analysis";
+import ProfitReport from "./pages/ProfitReport";
 import NotFound from "./pages/NotFound";
 import Movements from "./pages/Movements";
 import Expenses from "./pages/Expenses";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/warehouse" element={<Warehouse />} />
             <Route path="/pos" element={<POS />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/profit" element={<ProfitReport />} />
             <Route path="/returns" element={<Returns />} />
             <Route path="/movements" element={<Movements />} />
             <Route path="/expenses" element={<Expenses />} />

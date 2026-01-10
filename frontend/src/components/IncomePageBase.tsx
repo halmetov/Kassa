@@ -6,12 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export type IncomeBranch = { id: number; name: string; active?: boolean };
-export type IncomeProduct = { id: number; name: string; purchase_price?: number; sale_price?: number };
+export type IncomeProduct = { id: number; name: string; barcode?: string | null; purchase_price?: number; sale_price?: number };
 export type IncomeItem = { id: number; product_id: number; quantity: number; purchase_price: number; sale_price: number };
 export type IncomeRecord = { id: number; branch_id: number; created_at: string; items: IncomeItem[] };
 export type IncomeSubmitItem = { product_id: number; quantity: number; purchase_price: number; sale_price: number };
@@ -242,6 +244,77 @@ export function IncomePageBase({
   const getProductName = (id: number) => products.find((product) => product.id === id)?.name || `#${id}`;
   const getBranchName = (id: number) => branches.find((branch) => branch.id === id)?.name || fixedBranchName || `Филиал ${id}`;
 
+  const ProductCombobox = ({
+    value,
+    onChange,
+    placeholder = "Выберите товар",
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const selected = products.find((product) => String(product.id) === value);
+    const normalized = search.trim().toLowerCase();
+    const filtered = normalized
+      ? products.filter((product) => {
+          const nameMatch = product.name.toLowerCase().includes(normalized);
+          const barcodeMatch = product.barcode ? product.barcode.toLowerCase().includes(normalized) : false;
+          return nameMatch || barcodeMatch;
+        })
+      : products;
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            className="w-full justify-between"
+            onClick={() => {
+              setOpen((prev) => !prev);
+              setSearch("");
+            }}
+          >
+            {selected ? selected.name : placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[360px]" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Поиск по названию или штрихкоду"
+              value={search}
+              onValueChange={setSearch}
+            />
+            <CommandList>
+              <CommandEmpty>Ничего не найдено</CommandEmpty>
+              <CommandGroup>
+                {filtered.map((product) => (
+                  <CommandItem
+                    key={product.id}
+                    onSelect={() => {
+                      onChange(String(product.id));
+                      setSearch(product.name);
+                      setOpen(false);
+                    }}
+                    className="flex flex-col items-start gap-1"
+                  >
+                    <div className="font-semibold">{product.name}</div>
+                    {product.barcode && (
+                      <div className="text-xs text-muted-foreground">{product.barcode}</div>
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -285,18 +358,7 @@ export function IncomePageBase({
             </div>
             <div className="space-y-2">
               <Label htmlFor="product">Товар</Label>
-              <Select value={formData.product_id} onValueChange={handleSingleProductChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Выберите товар" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((product) => (
-                    <SelectItem key={product.id} value={String(product.id)}>
-                      {product.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProductCombobox value={formData.product_id} onChange={handleSingleProductChange} />
             </div>
             <div className="space-y-2">
               <Label>Количество</Label>
@@ -367,21 +429,10 @@ export function IncomePageBase({
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-2 flex-1">
                           <Label className="text-xs text-muted-foreground">Товар</Label>
-                          <Select
+                          <ProductCombobox
                             value={item.product_id}
-                            onValueChange={(value) => handleInvoiceProductChange(index, value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Выберите товар" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map((product) => (
-                                <SelectItem key={product.id} value={String(product.id)}>
-                                  {product.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            onChange={(value) => handleInvoiceProductChange(index, value)}
+                          />
                           {productName && (
                             <p className="text-xs text-muted-foreground truncate">{productName}</p>
                           )}
@@ -436,21 +487,10 @@ export function IncomePageBase({
                     {invoiceData.items.map((item, index) => (
                       <TableRow key={index}>
                         <TableCell>
-                          <Select
+                          <ProductCombobox
                             value={item.product_id}
-                            onValueChange={(value) => handleInvoiceProductChange(index, value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Выберите товар" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {products.map((product) => (
-                                <SelectItem key={product.id} value={String(product.id)}>
-                                  {product.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            onChange={(value) => handleInvoiceProductChange(index, value)}
+                          />
                         </TableCell>
                         <TableCell>
                           <Input

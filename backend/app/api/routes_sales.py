@@ -39,9 +39,7 @@ def _apply_date_filters(query, start_date: date | None, end_date: date | None, c
 
 def _enforce_employee_scope(query, current_user: User):
     if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        query = query.where(Sale.branch_id == current_user.branch_id)
+        query = query.where(Sale.seller_id == current_user.id)
     return query
 
 
@@ -104,9 +102,7 @@ async def list_sales(
         return_query = return_query.where(Return.created_by_id == seller_id)
     return_query = _apply_date_filters(return_query, start_date, end_date, Return.created_at)
     if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        return_query = return_query.where(Return.branch_id == current_user.branch_id)
+        return_query = return_query.where(Return.created_by_id == current_user.id)
     returns = db.execute(return_query.order_by(Return.created_at.desc())).scalars().unique().all()
     return_breakdowns = calculate_return_breakdowns(returns)
 
@@ -125,9 +121,7 @@ async def list_sales(
     debt_query = debt_query.where(func.coalesce(DebtPayment.amount, 0) != 0)
     debt_query = _apply_date_filters(debt_query, start_date, end_date, DebtPayment.created_at)
     if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        debt_query = debt_query.where(DebtPayment.branch_id == current_user.branch_id)
+        debt_query = debt_query.where(DebtPayment.processed_by_id == current_user.id)
     debt_payments = db.execute(debt_query.order_by(DebtPayment.created_at.desc())).scalars().unique().all()
 
     summaries: list[sales_schema.SaleSummary] = []
@@ -278,9 +272,7 @@ def _assert_sale_access(sale: Sale | None, current_user: User):
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
     if current_user.role == "employee":
-        if current_user.branch_id is None:
-            raise HTTPException(status_code=400, detail="Сотрудник не привязан к филиалу")
-        if sale.branch_id != current_user.branch_id:
+        if sale.seller_id != current_user.id:
             raise HTTPException(status_code=403, detail="Нет доступа к продаже")
 
 
