@@ -9,6 +9,7 @@ import { AuthUser, getCurrentUser } from "@/lib/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Layout = () => {
+  const HEADER_HEIGHT = "64px";
   const [open, setOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -30,14 +31,18 @@ export const Layout = () => {
     "/clients",
     "/reports",
   ];
-  const productionAllowedRoutes = [
+  const productionManagerAllowedRoutes = [
     "/workshop/orders",
     "/workshop/expenses",
     "/workshop/stock",
     "/workshop/income",
     "/workshop/employees",
     "/workshop/report",
+    "/workshop/salary",
   ];
+  const productionAllowedRoutes = productionManagerAllowedRoutes.filter(
+    (route) => route !== "/workshop/salary",
+  );
 
   const isPathAllowed = (path: string, allowed: string[]) =>
     allowed.some((route) => path === route || path.startsWith(`${route}/`));
@@ -83,10 +88,10 @@ export const Layout = () => {
     if (user?.role === "employee" && !employeeAllowedRoutes.includes(location.pathname)) {
       navigate("/pos", { replace: true });
     }
-    if (
-      (user?.role === "production_manager" || user?.role === "manager") &&
-      !isPathAllowed(location.pathname, productionAllowedRoutes)
-    ) {
+    if (user?.role === "production_manager" && !isPathAllowed(location.pathname, productionManagerAllowedRoutes)) {
+      navigate("/workshop/orders", { replace: true });
+    }
+    if (user?.role === "manager" && !isPathAllowed(location.pathname, productionAllowedRoutes)) {
       navigate("/workshop/orders", { replace: true });
     }
   }, [location.pathname, navigate, user?.role]);
@@ -137,57 +142,62 @@ export const Layout = () => {
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
       <div
-        className="min-h-screen flex w-full bg-background"
-        style={{ "--navbar-height": "3.5rem" } as CSSProperties}
+        className="min-h-screen w-full bg-background"
+        style={{ "--navbar-height": HEADER_HEIGHT } as CSSProperties}
       >
-        {(open || mobileSidebarOpen) && (
-          <div
-            className={`${mobileSidebarOpen ? "block" : "hidden md:block"} ${
-              open ? "md:w-auto" : "md:w-0 md:min-w-0 md:overflow-hidden"
-            } transition-[width] duration-200 relative z-40 md:z-auto`}
+        <header className="fixed top-0 left-0 right-0 z-40 h-[var(--navbar-height)] border-b bg-card flex items-center px-4 lg:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden relative z-40"
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleSidebar();
+            }}
           >
-            <AppSidebar
-              user={user}
-              isLoadingUser={isLoadingUser}
-              lowStockCount={lowStockCount}
-              isOpen={effectiveSidebarOpen}
-              onClose={closeSidebar}
-            />
+            <Menu className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </header>
+        <div className="grid min-h-screen grid-rows-[var(--navbar-height)_1fr]">
+          <div aria-hidden />
+          <div className="grid grid-cols-[auto_1fr] min-h-[calc(100svh-var(--navbar-height))]">
+            {(open || mobileSidebarOpen) && (
+              <div
+                className={`${mobileSidebarOpen ? "block" : "hidden md:block"} ${
+                  open ? "md:w-auto" : "md:w-0 md:min-w-0 md:overflow-hidden"
+                } transition-[width] duration-200 relative z-30 md:z-auto`}
+              >
+                <AppSidebar
+                  user={user}
+                  isLoadingUser={isLoadingUser}
+                  lowStockCount={lowStockCount}
+                  isOpen={effectiveSidebarOpen}
+                  onClose={closeSidebar}
+                />
+              </div>
+            )}
+            {mobileSidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/50 z-20 md:hidden"
+                onClick={closeSidebar}
+                aria-label="Закрыть меню"
+              />
+            )}
+            <main className="min-w-0 flex flex-col">
+              <div className="flex-1 p-4 lg:p-6">
+                <Outlet context={{ user, isAdmin }} />
+              </div>
+            </main>
           </div>
-        )}
-        {mobileSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-30 md:hidden"
-            onClick={closeSidebar}
-            aria-label="Закрыть меню"
-          />
-        )}
-        <main className="flex-1 flex flex-col">
-          <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-card flex items-center px-4 lg:px-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden relative z-50"
-              onClick={(event) => {
-                event.stopPropagation();
-                toggleSidebar();
-              }}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden md:inline-flex"
-              onClick={() => setOpen((prev) => !prev)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </header>
-          <div className="flex-1 p-4 lg:p-6 pt-[calc(var(--navbar-height)+1rem)] lg:pt-[calc(var(--navbar-height)+1.5rem)]">
-            <Outlet context={{ user, isAdmin }} />
-          </div>
-        </main>
+        </div>
       </div>
     </SidebarProvider>
   );

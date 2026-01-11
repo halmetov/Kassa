@@ -21,6 +21,7 @@ from .entities import (
     WorkshopOrder,
     WorkshopOrderMaterial,
     WorkshopOrderPayout,
+    WorkshopSalaryTransaction,
     WorkshopOrderClosure,
 )
 from .user import User
@@ -48,6 +49,7 @@ __all__ = [
     "WorkshopOrder",
     "WorkshopOrderMaterial",
     "WorkshopOrderPayout",
+    "WorkshopSalaryTransaction",
     "WorkshopOrderClosure",
     "User",
 ]
