@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -71,17 +70,14 @@ const systemItems = [
 type AppSidebarProps = {
   user: AuthUser | null;
   lowStockCount?: number;
-  isOpen: boolean;
-  onClose: () => void;
   isLoadingUser?: boolean;
 };
 
-export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser = false }: AppSidebarProps) {
+export function AppSidebar({ user, lowStockCount, isLoadingUser = false }: AppSidebarProps) {
   const { open, openMobile, setOpenMobile } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
-  const previousOpenMobile = useRef(openMobile);
 
   const isSystemActive = systemItems.some((item) => currentPath === item.url);
   const isProductionActive = productionMenuItems.some((item) => currentPath === item.url);
@@ -121,23 +117,14 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
     }
   };
 
-  useEffect(() => {
-    setOpenMobile(isOpen);
-  }, [isOpen, setOpenMobile]);
-
-  useEffect(() => {
-    if (previousOpenMobile.current && !openMobile) {
-      onClose();
-    }
-    previousOpenMobile.current = openMobile;
-  }, [onClose, openMobile]);
-
   const handleNavigate = () => {
-    onClose();
+    if (openMobile) {
+      setOpenMobile(false);
+    }
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r">
+    <Sidebar collapsible="offcanvas" className="border-r">
       <SidebarContent>
         <div className="p-4 border-b">
           {open && (

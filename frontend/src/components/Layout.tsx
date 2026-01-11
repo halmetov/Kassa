@@ -1,23 +1,20 @@
 import { useState, useEffect, type CSSProperties } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { apiGet } from "@/api/client";
 import { AuthUser, getCurrentUser } from "@/lib/auth";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Layout = () => {
   const HEADER_HEIGHT = "64px";
   const [open, setOpen] = useState(true);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [lowStockCount, setLowStockCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useIsMobile();
 
   const employeeAllowedRoutes = [
     "/",
@@ -46,9 +43,6 @@ export const Layout = () => {
 
   const isPathAllowed = (path: string, allowed: string[]) =>
     allowed.some((route) => path === route || path.startsWith(`${route}/`));
-
-  const toggleSidebar = () => setMobileSidebarOpen((prev) => !prev);
-  const closeSidebar = () => setMobileSidebarOpen(false);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem("sidebar-open") : null;
@@ -97,34 +91,6 @@ export const Layout = () => {
   }, [location.pathname, navigate, user?.role]);
 
   useEffect(() => {
-    setMobileSidebarOpen(false);
-  }, [location.pathname]);
-
-  const isAdmin = user?.role === "admin";
-
-  useEffect(() => {
-    if (!mobileSidebarOpen) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeSidebar();
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [mobileSidebarOpen]);
-
-  useEffect(() => {
-    if (!mobileSidebarOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [mobileSidebarOpen]);
-
-  const effectiveSidebarOpen = isMobile ? mobileSidebarOpen : open;
-
-  useEffect(() => {
     const loadLowStock = async () => {
       try {
         const items = await apiGet<{ id: number }[]>("/api/products/low-stock");
@@ -141,64 +107,72 @@ export const Layout = () => {
 
   return (
     <SidebarProvider open={open} onOpenChange={setOpen}>
-      <div
-        className="min-h-screen w-full bg-background"
-        style={{ "--navbar-height": HEADER_HEIGHT } as CSSProperties}
-      >
-        <header className="fixed top-0 left-0 right-0 z-40 h-[var(--navbar-height)] border-b bg-card flex items-center px-4 lg:px-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden relative z-40"
-            onClick={(event) => {
-              event.stopPropagation();
-              toggleSidebar();
-            }}
-          >
+      <LayoutShell
+        headerHeight={HEADER_HEIGHT}
+        user={user}
+        isLoadingUser={isLoadingUser}
+        lowStockCount={lowStockCount}
+        isAdmin={user?.role === "admin"}
+      />
+    </SidebarProvider>
+  );
+};
+
+type LayoutShellProps = {
+  headerHeight: string;
+  user: AuthUser | null;
+  isLoadingUser: boolean;
+  lowStockCount: number;
+  isAdmin: boolean;
+};
+
+const LayoutShell = ({ headerHeight, user, isLoadingUser, lowStockCount, isAdmin }: LayoutShellProps) => {
+  const { isMobile, open: sidebarOpen, openMobile, setOpenMobile, toggleSidebar } = useSidebar();
+  const location = useLocation();
+  const sidebarOffset = !isMobile && sidebarOpen ? "var(--sidebar-width)" : "0px";
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [location.pathname, setOpenMobile]);
+
+  useEffect(() => {
+    if (!openMobile) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [openMobile]);
+
+  return (
+    <div
+      className="min-h-screen w-full bg-background"
+      style={
+        {
+          "--navbar-height": headerHeight,
+          "--sidebar-offset": sidebarOffset,
+        } as CSSProperties
+      }
+    >
+      <AppSidebar user={user} isLoadingUser={isLoadingUser} lowStockCount={lowStockCount} />
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header
+          className="fixed top-0 right-0 z-40 flex h-[var(--navbar-height)] items-center gap-2 border-b bg-card px-4 lg:px-6"
+          style={{ left: "var(--sidebar-offset)" } as CSSProperties}
+        >
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleSidebar}>
             <Menu className="h-5 w-5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden md:inline-flex"
-            onClick={() => setOpen((prev) => !prev)}
-          >
+          <Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={toggleSidebar}>
             <Menu className="h-5 w-5" />
           </Button>
         </header>
-        <div className="grid min-h-screen grid-rows-[var(--navbar-height)_1fr]">
-          <div aria-hidden />
-          <div className="grid grid-cols-[auto_1fr] min-h-[calc(100svh-var(--navbar-height))]">
-            {(open || mobileSidebarOpen) && (
-              <div
-                className={`${mobileSidebarOpen ? "block" : "hidden md:block"} ${
-                  open ? "md:w-auto" : "md:w-0 md:min-w-0 md:overflow-hidden"
-                } transition-[width] duration-200 relative z-30 md:z-auto`}
-              >
-                <AppSidebar
-                  user={user}
-                  isLoadingUser={isLoadingUser}
-                  lowStockCount={lowStockCount}
-                  isOpen={effectiveSidebarOpen}
-                  onClose={closeSidebar}
-                />
-              </div>
-            )}
-            {mobileSidebarOpen && (
-              <div
-                className="fixed inset-0 bg-black/50 z-20 md:hidden"
-                onClick={closeSidebar}
-                aria-label="Закрыть меню"
-              />
-            )}
-            <main className="min-w-0 flex flex-col">
-              <div className="flex-1 p-4 lg:p-6">
-                <Outlet context={{ user, isAdmin }} />
-              </div>
-            </main>
+        <main className="min-w-0 flex-1 pt-[var(--navbar-height)]">
+          <div className="flex-1 p-4 lg:p-6">
+            <Outlet context={{ user, isAdmin }} />
           </div>
-        </div>
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   );
 };
