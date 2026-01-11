@@ -10,6 +10,8 @@ import Products from "./pages/Products";
 import Employees from "./pages/Employees";
 import Branches from "./pages/Branches";
 import Clients from "./pages/Clients";
+import Counterparties from "./pages/Counterparties";
+import CounterpartySales from "./pages/CounterpartySales";
 import Income from "./pages/Income";
 import POS from "./pages/POS";
 import Warehouse from "./pages/Warehouse";
@@ -44,6 +46,7 @@ const App = () => (
             <Route path="/income" element={<Income />} />
             <Route path="/warehouse" element={<Warehouse />} />
             <Route path="/pos" element={<POS />} />
+            <Route path="/counterparty-sales" element={<CounterpartySales />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/profit" element={<ProfitReport />} />
             <Route path="/returns" element={<Returns />} />
@@ -63,6 +66,7 @@ const App = () => (
             <Route path="/employees" element={<Employees />} />
             <Route path="/branches" element={<Branches />} />
             <Route path="/clients" element={<Clients />} />
+            <Route path="/counterparties" element={<Counterparties />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

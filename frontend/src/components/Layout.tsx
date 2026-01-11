@@ -19,6 +19,7 @@ export const Layout = () => {
   const employeeAllowedRoutes = [
     "/",
     "/pos",
+    "/counterparty-sales",
     "/warehouse",
     "/income",
     "/returns",

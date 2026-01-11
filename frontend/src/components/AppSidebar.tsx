@@ -15,6 +15,7 @@ import {
   TrendingDown,
   Package,
   ShoppingCart,
+  ShoppingBag,
   Warehouse,
   RotateCcw,
   BarChart3,
@@ -42,6 +43,7 @@ const menuItems = [
   { title: "Склад", url: "/warehouse", icon: Warehouse },
   { title: "Перемещение", url: "/movements", icon: ArrowLeftRight },
   { title: "Касса", url: "/pos", icon: ShoppingCart },
+  { title: "Продажа", url: "/counterparty-sales", icon: ShoppingBag },
   { title: "Возврат", url: "/returns", icon: RotateCcw },
   { title: "Отчет", url: "/reports", icon: FileText },
   { title: "Отчет по прибыли", url: "/reports/profit", icon: FileText, adminOnly: true },
@@ -63,6 +65,7 @@ const systemItems = [
   { title: "Категории", url: "/categories", icon: Tags, adminOnly: false },
   { title: "Товары", url: "/products", icon: Package, adminOnly: false },
   { title: "Клиенты", url: "/clients", icon: UserCircle, adminOnly: false },
+  { title: "Контрагенты", url: "/counterparties", icon: Users, adminOnly: true },
   { title: "Сотрудники", url: "/employees", icon: Users, adminOnly: true },
   { title: "Филиалы", url: "/branches", icon: Building2, adminOnly: true },
 ];
@@ -88,6 +91,7 @@ export function AppSidebar({ user, lowStockCount, isLoadingUser = false }: AppSi
 
   const allowedForEmployee = [
     "/pos",
+    "/counterparty-sales",
     "/warehouse",
     "/income",
     "/returns",
