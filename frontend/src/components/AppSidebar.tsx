@@ -56,6 +56,7 @@ const productionMenuItems = [
   { title: "Приход (Цех)", url: "/workshop/income", icon: TrendingDown },
   { title: "Производственные расходы", url: "/workshop/expenses", icon: HandCoins },
   { title: "Сотрудники (Цех)", url: "/workshop/employees", icon: Users },
+  { title: "Зарплата", url: "/workshop/salary", icon: HandCoins, roles: ["admin", "production_manager"] },
   { title: "Отчет (Цех)", url: "/workshop/report", icon: FileText },
 ];
 
@@ -207,7 +208,13 @@ export function AppSidebar({ user, lowStockCount, isOpen, onClose, isLoadingUser
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {productionMenuItems.map((item) => (
+                    {productionMenuItems
+                      .filter((item) => {
+                        if (!item.roles) return true;
+                        if (!user) return false;
+                        return item.roles.includes(user.role);
+                      })
+                      .map((item) => (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton asChild>
                           <NavLink

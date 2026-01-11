@@ -443,6 +443,23 @@ class WorkshopOrderPayout(Base, TimestampMixin):
     employee: Mapped[WorkshopEmployee] = relationship("WorkshopEmployee")
 
 
+class WorkshopSalaryTransaction(Base):
+    __tablename__ = "workshop_salary_transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("workshop_employees.id", ondelete="SET NULL"), nullable=True
+    )
+    type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    employee: Mapped[Optional[WorkshopEmployee]] = relationship("WorkshopEmployee")
+    created_by: Mapped[Optional["User"]] = relationship("User")
+
+
 class WorkshopOrderClosure(Base, TimestampMixin):
     __tablename__ = "workshop_order_closures"
 
