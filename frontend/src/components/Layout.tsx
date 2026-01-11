@@ -132,6 +132,13 @@ const LayoutShell = ({ headerHeight, user, isLoadingUser, lowStockCount, isAdmin
   const sidebarOffset = !isMobile && sidebarOpen ? "var(--sidebar-width)" : "0px";
 
   useEffect(() => {
+    document.documentElement.style.setProperty("--navbar-height", headerHeight);
+    return () => {
+      document.documentElement.style.removeProperty("--navbar-height");
+    };
+  }, [headerHeight]);
+
+  useEffect(() => {
     setOpenMobile(false);
   }, [location.pathname, setOpenMobile]);
 
@@ -146,7 +153,7 @@ const LayoutShell = ({ headerHeight, user, isLoadingUser, lowStockCount, isAdmin
 
   return (
     <div
-      className="min-h-screen w-full bg-background"
+      className="flex min-h-screen w-full bg-background"
       style={
         {
           "--navbar-height": headerHeight,
@@ -155,7 +162,7 @@ const LayoutShell = ({ headerHeight, user, isLoadingUser, lowStockCount, isAdmin
       }
     >
       <AppSidebar user={user} isLoadingUser={isLoadingUser} lowStockCount={lowStockCount} />
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header
           className="fixed top-0 right-0 z-40 flex h-[var(--navbar-height)] items-center gap-2 border-b bg-card px-4 lg:px-6"
           style={{ left: "var(--sidebar-offset)" } as CSSProperties}
