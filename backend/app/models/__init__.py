@@ -1,6 +1,9 @@
 from .entities import (
     Branch,
     Category,
+    Counterparty,
+    CounterpartySale,
+    CounterpartySaleItem,
     Client,
     Debt,
     DebtPayment,
@@ -29,6 +32,9 @@ from .user import User
 __all__ = [
     "Branch",
     "Category",
+    "Counterparty",
+    "CounterpartySale",
+    "CounterpartySaleItem",
     "Client",
     "Debt",
     "DebtPayment",
