@@ -114,12 +114,12 @@ export default function WorkshopTemplates() {
   const updateTemplate = async () => {
     if (!selectedTemplate) return;
     try {
-      const updated = await apiPut<TemplateDetail>(`/api/workshop/templates/${selectedTemplate.id}`, {
+      await apiPut<TemplateDetail>(`/api/workshop/templates/${selectedTemplate.id}`, {
         name: selectedTemplate.name,
         description: selectedTemplate.description || undefined,
         active: selectedTemplate.active,
       });
-      setSelectedTemplate(updated);
+      setSelectedTemplate(null);
       toast.success("Шаблон обновлен");
       loadTemplates();
     } catch (error: any) {
