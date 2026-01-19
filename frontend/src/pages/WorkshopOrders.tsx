@@ -98,6 +98,7 @@ export default function WorkshopOrders() {
     try {
       const data = await apiGet<TemplateDetail>(`/api/workshop/templates/${templateId}`);
       setSelectedTemplate(data);
+      setTitle(data.name);
     } catch (error: any) {
       toast.error(error?.message || "Не удалось загрузить шаблон");
     }
