@@ -504,6 +504,7 @@ class WorkshopOrder(Base, TimestampMixin):
     paid_amount: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(12, 2), nullable=True
     )
+    debt_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     order_type_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("workshop_order_types.id", ondelete="SET NULL"), nullable=True
     )

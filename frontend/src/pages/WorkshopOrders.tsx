@@ -15,7 +15,7 @@ interface WorkshopOrder { id: number; title: string; amount: number; status: str
 interface TemplateOption { id: number; name: string }
 interface TemplateItem { id: number; product_name?: string; quantity: number; unit?: string }
 interface TemplateDetail { id: number; name: string; items: TemplateItem[] }
-interface DictOption { id: number; name?: string }
+interface DictOption { id: number; name?: string; phone?: string }
 
 export default function WorkshopOrders() {
   const [orders, setOrders] = useState<WorkshopOrder[]>([]);
@@ -23,6 +23,9 @@ export default function WorkshopOrders() {
   const [amount, setAmount] = useState("0");
   const [quantity, setQuantity] = useState("1");
   const [customerId, setCustomerId] = useState("");
+  const [newCustomerMode, setNewCustomerMode] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [orderTypeId, setOrderTypeId] = useState("");
   const [description, setDescription] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -62,13 +65,23 @@ export default function WorkshopOrders() {
 
   const createOrder = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!orderTypeId) {
+      toast.error("Выберите тип заказа");
+      return;
+    }
+    if (newCustomerMode && !newCustomerName.trim()) {
+      toast.error("Введите имя нового заказчика");
+      return;
+    }
     try {
       const order = await apiPost<WorkshopOrder>("/api/workshop/orders", {
         title,
         amount: Number(amount) || 0,
         quantity: Math.max(1, Number(quantity) || 1),
-        customer_id: customerId ? Number(customerId) : undefined,
-        order_type_id: orderTypeId ? Number(orderTypeId) : undefined,
+        customer_id: !newCustomerMode && customerId ? Number(customerId) : undefined,
+        customer_new_name: newCustomerMode ? newCustomerName.trim() : undefined,
+        customer_new_phone: newCustomerMode ? (newCustomerPhone.trim() || undefined) : undefined,
+        order_type_id: Number(orderTypeId),
         description: description || undefined,
         template_id: selectedTemplate?.id || undefined,
       });
@@ -77,7 +90,7 @@ export default function WorkshopOrders() {
         formData.append("file", photoFile);
         await apiUpload(`/api/workshop/orders/${order.id}/photo`, formData);
       }
-      setTitle(""); setAmount("0"); setQuantity("1"); setCustomerId(""); setOrderTypeId(""); setDescription(""); setPhotoFile(null); setSelectedTemplate(null);
+      setTitle(""); setAmount("0"); setQuantity("1"); setCustomerId(""); setOrderTypeId(""); setDescription(""); setPhotoFile(null); setSelectedTemplate(null); setNewCustomerMode(false); setNewCustomerName(""); setNewCustomerPhone("");
       await loadOrders(); toast.success("Заказ создан");
     } catch (error: any) { toast.error(error?.message || "Не удалось создать заказ"); }
   };
@@ -90,8 +103,16 @@ export default function WorkshopOrders() {
         <div className="grid gap-1"><Label>Название заказа</Label><Input value={title} onChange={(e)=>setTitle(e.target.value)} required /></div>
         <div className="grid gap-1"><Label>Сумма</Label><Input type="number" step="0.01" value={amount} onChange={(e)=>setAmount(e.target.value)} /></div>
         <div className="grid gap-1"><Label>Количество</Label><Input type="number" min={1} value={quantity} onChange={(e)=>setQuantity(e.target.value)} required /></div>
-        <div className="grid gap-1"><Label>Заказчик</Label><select className="border rounded h-10 px-3 bg-background" value={customerId} onChange={(e)=>setCustomerId(e.target.value)}><option value="">Не выбран</option>{customers.map((c)=><option key={c.id} value={c.id}>{c.name || `#${c.id}`}</option>)}</select></div>
-        <div className="grid gap-1"><Label>Тип заказа</Label><select className="border rounded h-10 px-3 bg-background" value={orderTypeId} onChange={(e)=>setOrderTypeId(e.target.value)}><option value="">Не выбран</option>{orderTypes.map((c)=><option key={c.id} value={c.id}>{c.name || `#${c.id}`}</option>)}</select></div>
+        <div className="grid gap-1"><Label>Тип заказа *</Label><select required className="border rounded h-10 px-3 bg-background" value={orderTypeId} onChange={(e)=>setOrderTypeId(e.target.value)}><option value="">Выберите тип</option>{orderTypes.map((c)=><option key={c.id} value={c.id}>{c.name || `#${c.id}`}</option>)}</select></div>
+        <div className="flex items-center gap-2 text-sm"><input id="new-customer" type="checkbox" checked={newCustomerMode} onChange={(e)=>setNewCustomerMode(e.target.checked)} /><Label htmlFor="new-customer">Новый заказчик</Label></div>
+        {!newCustomerMode ? (
+          <div className="grid gap-1"><Label>Заказчик</Label><select className="border rounded h-10 px-3 bg-background" value={customerId} onChange={(e)=>setCustomerId(e.target.value)}><option value="">Не выбран</option>{customers.map((c)=><option key={c.id} value={c.id}>{c.name || `#${c.id}`}</option>)}</select></div>
+        ) : (
+          <>
+            <div className="grid gap-1"><Label>Имя заказчика *</Label><Input value={newCustomerName} onChange={(e)=>setNewCustomerName(e.target.value)} required={newCustomerMode} /></div>
+            <div className="grid gap-1"><Label>Телефон</Label><Input value={newCustomerPhone} onChange={(e)=>setNewCustomerPhone(e.target.value)} /></div>
+          </>
+        )}
         <div className="grid gap-1"><Label>Описание</Label><Textarea value={description} onChange={(e)=>setDescription(e.target.value)} /></div>
         <div className="grid gap-1"><Label>Фото</Label><Input type="file" accept="image/*" onChange={(event) => setPhotoFile(event.target.files?.[0] || null)} /></div>
         <Button type="submit">Создать</Button>

@@ -99,8 +99,6 @@ def _serialize_template_detail(
         active=template.active,
         amount=template.amount,
         order_type_id=template.order_type_id,
-        quantity=template.quantity,
-        customer_id=template.customer_id,
         photo=template.photo,
         branch_id=template.branch_id,
         created_by_id=template.created_by_id,
@@ -136,6 +134,49 @@ def _recalculate_order_totals(order: WorkshopOrder) -> None:
         payout.per_unit_amount = base_amount
         payout.total_amount = base_amount * multiplier
         payout.amount = payout.total_amount
+
+
+def _resolve_customer(
+    db: Session,
+    customer_id: Optional[int],
+    customer_new_name: Optional[str],
+    customer_new_phone: Optional[str],
+) -> Optional[int]:
+    if customer_id is not None:
+        customer = db.get(WorkshopCustomer, customer_id)
+        if not customer:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказчик не найден")
+        return customer.id
+    if customer_new_name:
+        customer = WorkshopCustomer(
+            name=customer_new_name.strip(),
+            phone=(customer_new_phone or "").strip() or None,
+            debt=Decimal("0"),
+            active=True,
+        )
+        db.add(customer)
+        db.flush()
+        return customer.id
+    return None
+
+
+def _ensure_order_materials_available_for_close(db: Session, order: WorkshopOrder) -> None:
+    branch = _get_workshop_branch(db)
+    product_ids = [item.product_id for item in order.materials]
+    if not product_ids:
+        return
+    stocks = (
+        db.query(Stock, Product)
+        .join(Product, Product.id == Stock.product_id)
+        .filter(Stock.branch_id == branch.id, Stock.product_id.in_(product_ids), Stock.quantity < 0)
+        .all()
+    )
+    if stocks:
+        names = ", ".join(sorted({product.name for _, product in stocks}))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Нельзя закрыть заказ: не хватает материалов на складе Цех (товары: {names})",
+        )
 
 def _parse_month(month: Optional[str]) -> tuple[datetime, datetime, str]:
     if month:
@@ -434,9 +475,11 @@ def create_order(
         template = _get_template(db, payload.template_id)
         if template.branch_id != branch.id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Шаблон недоступен для цеха")
-    order_type_id = payload.order_type_id if payload.order_type_id is not None else (template.order_type_id if template else None)
-    customer_id = payload.customer_id if payload.customer_id is not None else (template.customer_id if template else None)
-    quantity = payload.quantity if payload.quantity is not None else (template.quantity if template and template.quantity else 1)
+    order_type = db.get(WorkshopOrderType, payload.order_type_id)
+    if not order_type:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип заказа не найден")
+    customer_id = _resolve_customer(db, payload.customer_id, payload.customer_new_name, payload.customer_new_phone)
+    quantity = payload.quantity if payload.quantity is not None else 1
     order = WorkshopOrder(
         title=payload.title,
         amount=payload.amount or (template.amount if template else Decimal("0")) or Decimal("0"),
@@ -445,7 +488,7 @@ def create_order(
         created_by_user_id=current_user.id,
         branch_id=branch.id,
         template_id=template.id if template else None,
-        order_type_id=order_type_id,
+        order_type_id=payload.order_type_id,
         quantity=quantity,
         customer_id=customer_id,
         photo=payload.photo,
@@ -489,8 +532,8 @@ def create_order(
                 .with_for_update()
                 .first()
             )
-            if not stock or stock.quantity < float(total_qty):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недостаточно остатков на складе")
+            if not stock:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Товар недоступен для цеха")
             stock.quantity = stock.quantity - float(total_qty)
             material = WorkshopOrderMaterial(
                 order_id=order.id,
@@ -569,8 +612,6 @@ def create_template(
         active=payload.active,
         amount=payload.amount,
         order_type_id=payload.order_type_id,
-        quantity=payload.quantity,
-        customer_id=payload.customer_id,
         photo=payload.photo,
         branch_id=branch.id,
         created_by_id=current_user.id,
@@ -807,6 +848,7 @@ def _serialize_order_detail(order: WorkshopOrder, db: Session) -> workshop_schem
         template_id=order.template_id,
         photo=order.photo,
         paid_amount=order.paid_amount,
+        debt_amount=order.debt_amount,
         order_type_id=order.order_type_id,
         quantity=order.quantity,
         customer_id=order.customer_id,
@@ -833,12 +875,55 @@ def update_order(order_id: int, payload: workshop_schema.WorkshopOrderUpdate, db
     _assert_order_open(order)
     if payload.status == "closed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use close endpoint to close order")
+    if order.order_type_id is None and payload.order_type_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Тип заказа обязателен")
     updates = payload.model_dump(exclude_unset=True)
     quantity_changed = "quantity" in updates
+    if "order_type_id" in updates and updates["order_type_id"] is not None:
+        order_type = db.get(WorkshopOrderType, updates["order_type_id"])
+        if not order_type:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип заказа не найден")
+    if "customer_id" in updates or "customer_new_name" in updates or "customer_new_phone" in updates:
+        updates["customer_id"] = _resolve_customer(
+            db,
+            updates.get("customer_id"),
+            updates.get("customer_new_name"),
+            updates.get("customer_new_phone"),
+        )
+    updates.pop("customer_new_name", None)
+    updates.pop("customer_new_phone", None)
     for field, value in updates.items():
         setattr(order, field, value)
     if quantity_changed:
-        _recalculate_order_totals(order)
+        workshop_branch = _get_workshop_branch(db)
+        for material in order.materials:
+            old_total = material.total_qty if material.total_qty is not None else material.quantity or Decimal("0")
+            base_qty = material.per_unit_qty if material.per_unit_qty is not None else material.quantity or Decimal("0")
+            new_total = base_qty * _order_multiplier(order)
+            delta = new_total - old_total
+            stock = (
+                db.query(Stock)
+                .filter(Stock.branch_id == workshop_branch.id, Stock.product_id == material.product_id)
+                .with_for_update()
+                .first()
+            )
+            if not stock:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Товар недоступен для цеха")
+            stock.quantity = stock.quantity - float(delta)
+            material.per_unit_qty = base_qty
+            material.total_qty = new_total
+            material.quantity = new_total
+        for payout in order.payouts:
+            old_total = payout.total_amount if payout.total_amount is not None else payout.amount or Decimal("0")
+            base_amount = payout.per_unit_amount if payout.per_unit_amount is not None else payout.amount or Decimal("0")
+            new_total = base_amount * _order_multiplier(order)
+            delta = new_total - old_total
+            employee = db.get(WorkshopEmployee, payout.employee_id)
+            if employee:
+                employee.total_salary = (employee.total_salary or Decimal("0")) + delta
+            payout.per_unit_amount = base_amount
+            payout.total_amount = new_total
+            payout.amount = new_total
     db.commit()
     db.refresh(order)
     return order
@@ -891,8 +976,8 @@ def add_material(order_id: int, payload: workshop_schema.WorkshopMaterialCreate,
         .with_for_update()
         .first()
     )
-    if not stock or stock.quantity < float(total_qty):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недостаточно остатков на складе")
+    if not stock:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Товар недоступен для цеха")
     stock.quantity = stock.quantity - float(total_qty)
     material = WorkshopOrderMaterial(
         order_id=order.id,
@@ -964,16 +1049,42 @@ def close_order(
     order = _get_order(db, order_id)
     if payload.paid_amount < 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="paid_amount must be non-negative")
+    if order.order_type_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Тип заказа обязателен")
     if order.status == "closed":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Order is closed")
+    _ensure_order_materials_available_for_close(db, order)
+
+    customer_id = order.customer_id
+    if payload.customer_id is not None or payload.customer_new_name:
+        customer_id = _resolve_customer(db, payload.customer_id, payload.customer_new_name, payload.customer_new_phone)
+    order.customer_id = customer_id
+
+    paid_amount = Decimal(str(payload.paid_amount or 0))
+    order_amount = order.amount or Decimal("0")
+    debt_amount = payload.debt_amount
+    if debt_amount is None:
+        debt_amount = max(Decimal("0"), order_amount - paid_amount)
+    debt_amount = Decimal(str(debt_amount))
+
+    if debt_amount > 0 and order.customer_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Для долга необходимо указать заказчика")
+
+    if debt_amount > 0 and order.customer_id is not None:
+        customer = db.get(WorkshopCustomer, order.customer_id)
+        if not customer:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказчик не найден")
+        customer.debt = (customer.debt or Decimal("0")) + debt_amount
+
     now = datetime.utcnow()
     order.status = "closed"
     order.closed_at = now
-    order.paid_amount = payload.paid_amount
+    order.paid_amount = paid_amount
+    order.debt_amount = debt_amount
     closure = WorkshopOrderClosure(
         order_id=order.id,
-        order_amount=order.amount or Decimal("0"),
-        paid_amount=payload.paid_amount,
+        order_amount=order_amount,
+        paid_amount=paid_amount,
         note=payload.note,
         closed_at=now,
         closed_by_user_id=current_user.id,

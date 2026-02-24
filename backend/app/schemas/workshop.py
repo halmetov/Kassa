@@ -128,9 +128,13 @@ class WorkshopOrderBase(BaseModel):
     order_type_id: Optional[int] = None
     quantity: Optional[int] = Field(default=1, ge=1)
     customer_id: Optional[int] = None
+    customer_new_name: Optional[str] = None
+    customer_new_phone: Optional[str] = None
+    debt_amount: Optional[Decimal] = None
 
 
 class WorkshopOrderCreate(WorkshopOrderBase):
+    order_type_id: int = Field(...)
     template_id: Optional[int] = None
     materials: Optional[list["WorkshopMaterialCreate"]] = None
 
@@ -144,6 +148,9 @@ class WorkshopOrderUpdate(BaseModel):
     order_type_id: Optional[int] = None
     quantity: Optional[int] = Field(default=None, ge=1)
     customer_id: Optional[int] = None
+    customer_new_name: Optional[str] = None
+    customer_new_phone: Optional[str] = None
+    debt_amount: Optional[Decimal] = None
 
 
 class WorkshopOrderOut(WorkshopOrderBase):
@@ -238,8 +245,6 @@ class WorkshopOrderTemplateBase(BaseModel):
     active: bool = True
     amount: Optional[Decimal] = Field(default=Decimal("0"))
     order_type_id: Optional[int] = None
-    quantity: Optional[int] = Field(default=1, ge=1)
-    customer_id: Optional[int] = None
     photo: Optional[str] = None
 
 
@@ -253,8 +258,6 @@ class WorkshopOrderTemplateUpdate(BaseModel):
     active: Optional[bool] = None
     amount: Optional[Decimal] = None
     order_type_id: Optional[int] = None
-    quantity: Optional[int] = Field(default=None, ge=1)
-    customer_id: Optional[int] = None
     photo: Optional[str] = None
 
 
@@ -284,6 +287,11 @@ class WorkshopOrderTemplateListOut(BaseModel):
 
 class WorkshopClosePayload(BaseModel):
     paid_amount: Decimal = Field(ge=0)
+    debt_amount: Optional[Decimal] = Field(default=None, ge=0)
+    payment_method: Optional[str] = None
+    customer_id: Optional[int] = None
+    customer_new_name: Optional[str] = None
+    customer_new_phone: Optional[str] = None
     note: Optional[str] = None
 
 
