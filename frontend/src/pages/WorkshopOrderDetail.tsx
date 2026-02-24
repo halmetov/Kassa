@@ -38,6 +38,7 @@ interface Order {
   amount: number;
   status: string;
   customer_name?: string;
+  quantity?: number;
   materials: Material[];
   payouts: Payout[];
   closed_at?: string | null;
@@ -206,6 +207,7 @@ export default function WorkshopOrderDetail() {
         description: order.description,
         customer_name: order.customer_name,
         status: order.status,
+        quantity: order.quantity || 1,
       });
       toast.success("Заказ обновлен");
     } catch (error: any) {
@@ -270,6 +272,13 @@ export default function WorkshopOrderDetail() {
             placeholder="Статус"
             value={order.status}
             onChange={(e) => setOrder({ ...order, status: e.target.value })}
+            disabled={isClosed}
+          />
+          <Input
+            type="number"
+            min={1}
+            value={order.quantity || 1}
+            onChange={(e) => setOrder({ ...order, quantity: Number(e.target.value) })}
             disabled={isClosed}
           />
           <Input

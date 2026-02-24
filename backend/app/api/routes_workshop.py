@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth.security import get_current_user, require_production_access, require_workshop_only
+from app.core.enums import UserRole
 from app.database.session import get_db
 from app.models import (
     Branch,
@@ -21,6 +22,8 @@ from app.models import (
     User,
     WorkshopEmployee,
     WorkshopOrder,
+    WorkshopOrderType,
+    WorkshopCustomer,
     WorkshopOrderClosure,
     WorkshopOrderMaterial,
     WorkshopOrderPayout,
@@ -94,6 +97,11 @@ def _serialize_template_detail(
         name=template.name,
         description=template.description,
         active=template.active,
+        amount=template.amount,
+        order_type_id=template.order_type_id,
+        quantity=template.quantity,
+        customer_id=template.customer_id,
+        photo=template.photo,
         branch_id=template.branch_id,
         created_by_id=template.created_by_id,
         created_at=template.created_at,
@@ -101,6 +109,33 @@ def _serialize_template_detail(
         items=items,
     )
 
+
+
+
+def _require_order_dict_access(current_user: User = Depends(get_current_user)) -> User:
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role not in {UserRole.ADMIN.value, UserRole.MANAGER.value}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return current_user
+
+
+def _order_multiplier(order: WorkshopOrder) -> Decimal:
+    quantity = order.quantity if order.quantity and order.quantity > 0 else 1
+    return Decimal(str(quantity))
+
+
+def _recalculate_order_totals(order: WorkshopOrder) -> None:
+    multiplier = _order_multiplier(order)
+    for material in order.materials:
+        base_qty = material.per_unit_qty if material.per_unit_qty is not None else material.quantity or Decimal("0")
+        material.per_unit_qty = base_qty
+        material.total_qty = base_qty * multiplier
+        material.quantity = material.total_qty
+    for payout in order.payouts:
+        base_amount = payout.per_unit_amount if payout.per_unit_amount is not None else payout.amount or Decimal("0")
+        payout.per_unit_amount = base_amount
+        payout.total_amount = base_amount * multiplier
+        payout.amount = payout.total_amount
 
 def _parse_month(month: Optional[str]) -> tuple[datetime, datetime, str]:
     if month:
@@ -262,6 +297,120 @@ def search_employees(
     return results
 
 
+@router.get("/order-types", response_model=list[workshop_schema.WorkshopOrderTypeOut])
+def list_order_types(
+    active: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(WorkshopOrderType)
+    if active is not None:
+        query = query.filter(WorkshopOrderType.active.is_(active))
+    return query.order_by(WorkshopOrderType.name.asc()).all()
+
+
+@router.post(
+    "/order-types",
+    response_model=workshop_schema.WorkshopOrderTypeOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_require_order_dict_access)],
+)
+def create_order_type(payload: workshop_schema.WorkshopOrderTypeCreate, db: Session = Depends(get_db)):
+    exists = db.query(WorkshopOrderType).filter(func.lower(WorkshopOrderType.name) == payload.name.strip().lower()).first()
+    if exists:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Тип заказа уже существует")
+    item = WorkshopOrderType(name=payload.name.strip(), active=payload.active)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put(
+    "/order-types/{item_id}",
+    response_model=workshop_schema.WorkshopOrderTypeOut,
+    dependencies=[Depends(_require_order_dict_access)],
+)
+def update_order_type(item_id: int, payload: workshop_schema.WorkshopOrderTypeUpdate, db: Session = Depends(get_db)):
+    item = db.get(WorkshopOrderType, item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип заказа не найден")
+    updates = payload.model_dump(exclude_unset=True)
+    if "name" in updates and updates["name"] is not None:
+        updates["name"] = updates["name"].strip()
+        exists = db.query(WorkshopOrderType).filter(
+            func.lower(WorkshopOrderType.name) == updates["name"].lower(),
+            WorkshopOrderType.id != item_id,
+        ).first()
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Тип заказа уже существует")
+    for field, value in updates.items():
+        setattr(item, field, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/order-types/{item_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(_require_order_dict_access)])
+def delete_order_type(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(WorkshopOrderType, item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип заказа не найден")
+    db.delete(item)
+    db.commit()
+    return None
+
+
+@router.get("/customers", response_model=list[workshop_schema.WorkshopCustomerOut])
+def list_customers(
+    active: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+):
+    query = db.query(WorkshopCustomer)
+    if active is not None:
+        query = query.filter(WorkshopCustomer.active.is_(active))
+    return query.order_by(WorkshopCustomer.id.desc()).all()
+
+
+@router.post(
+    "/customers",
+    response_model=workshop_schema.WorkshopCustomerOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_require_order_dict_access)],
+)
+def create_customer(payload: workshop_schema.WorkshopCustomerCreate, db: Session = Depends(get_db)):
+    item = WorkshopCustomer(**payload.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put(
+    "/customers/{item_id}",
+    response_model=workshop_schema.WorkshopCustomerOut,
+    dependencies=[Depends(_require_order_dict_access)],
+)
+def update_customer(item_id: int, payload: workshop_schema.WorkshopCustomerUpdate, db: Session = Depends(get_db)):
+    item = db.get(WorkshopCustomer, item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказчик не найден")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(item, field, value.strip() if isinstance(value, str) else value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/customers/{item_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(_require_order_dict_access)])
+def delete_customer(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(WorkshopCustomer, item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Заказчик не найден")
+    db.delete(item)
+    db.commit()
+    return None
+
+
 @router.get("/orders", response_model=list[workshop_schema.WorkshopOrderOut])
 def list_orders(db: Session = Depends(get_db)):
     branch = _get_workshop_branch(db)
@@ -285,18 +434,26 @@ def create_order(
         template = _get_template(db, payload.template_id)
         if template.branch_id != branch.id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Шаблон недоступен для цеха")
+    order_type_id = payload.order_type_id if payload.order_type_id is not None else (template.order_type_id if template else None)
+    customer_id = payload.customer_id if payload.customer_id is not None else (template.customer_id if template else None)
+    quantity = payload.quantity if payload.quantity is not None else (template.quantity if template and template.quantity else 1)
     order = WorkshopOrder(
         title=payload.title,
-        amount=payload.amount or Decimal("0"),
+        amount=payload.amount or (template.amount if template else Decimal("0")) or Decimal("0"),
         customer_name=payload.customer_name,
         description=payload.description,
         created_by_user_id=current_user.id,
         branch_id=branch.id,
         template_id=template.id if template else None,
+        order_type_id=order_type_id,
+        quantity=quantity,
+        customer_id=customer_id,
+        photo=payload.photo,
     )
     db.add(order)
     db.flush()
 
+    multiplier = _order_multiplier(order)
     materials_payload = payload.materials or []
     template_items = template.items if template else []
     material_map: dict[int, dict[str, Decimal | Optional[str]]] = {}
@@ -306,37 +463,41 @@ def create_order(
             continue
         existing = material_map.get(item.product_id)
         if existing:
-            existing["quantity"] = existing["quantity"] + item.quantity
+            existing["per_unit_qty"] = existing["per_unit_qty"] + item.quantity
         else:
-            material_map[item.product_id] = {"quantity": item.quantity, "unit": None}
+            material_map[item.product_id] = {"per_unit_qty": item.quantity, "unit": None}
 
     for item in materials_payload:
-        if item.quantity <= 0:
+        per_unit_qty = item.per_unit_qty if item.per_unit_qty is not None else item.quantity
+        if per_unit_qty <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity must be positive")
         existing = material_map.get(item.product_id)
         if existing:
-            existing["quantity"] = existing["quantity"] + item.quantity
+            existing["per_unit_qty"] = existing["per_unit_qty"] + per_unit_qty
             if item.unit:
                 existing["unit"] = item.unit
         else:
-            material_map[item.product_id] = {"quantity": item.quantity, "unit": item.unit}
+            material_map[item.product_id] = {"per_unit_qty": per_unit_qty, "unit": item.unit}
 
     if material_map:
         for product_id, data in material_map.items():
             product = _ensure_workshop_product(db, branch.id, product_id)
+            total_qty = data["per_unit_qty"] * multiplier
             stock = (
                 db.query(Stock)
                 .filter(Stock.branch_id == branch.id, Stock.product_id == product_id)
                 .with_for_update()
                 .first()
             )
-            if not stock or stock.quantity < float(data["quantity"]):
+            if not stock or stock.quantity < float(total_qty):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недостаточно остатков на складе")
-            stock.quantity = stock.quantity - float(data["quantity"])
+            stock.quantity = stock.quantity - float(total_qty)
             material = WorkshopOrderMaterial(
                 order_id=order.id,
                 product_id=product_id,
-                quantity=data["quantity"],
+                quantity=total_qty,
+                per_unit_qty=data["per_unit_qty"],
+                total_qty=total_qty,
                 unit=(data["unit"] or product.unit),
             )
             db.add(material)
@@ -406,6 +567,11 @@ def create_template(
         name=payload.name,
         description=payload.description,
         active=payload.active,
+        amount=payload.amount,
+        order_type_id=payload.order_type_id,
+        quantity=payload.quantity,
+        customer_id=payload.customer_id,
+        photo=payload.photo,
         branch_id=branch.id,
         created_by_id=current_user.id,
     )
@@ -599,6 +765,8 @@ def _serialize_order_detail(order: WorkshopOrder, db: Session) -> workshop_schem
                 id=material.id,
                 product_id=material.product_id,
                 quantity=material.quantity,
+                per_unit_qty=material.per_unit_qty,
+                total_qty=material.total_qty,
                 unit=material.unit,
                 created_at=material.created_at,
                 product_name=product.name if product else "",
@@ -616,6 +784,8 @@ def _serialize_order_detail(order: WorkshopOrder, db: Session) -> workshop_schem
                 id=payout.id,
                 employee_id=payout.employee_id,
                 amount=payout.amount,
+                per_unit_amount=payout.per_unit_amount,
+                total_amount=payout.total_amount,
                 note=payout.note,
                 created_at=payout.created_at,
                 employee_name=full_name or (employee.first_name if employee else ""),
@@ -637,6 +807,9 @@ def _serialize_order_detail(order: WorkshopOrder, db: Session) -> workshop_schem
         template_id=order.template_id,
         photo=order.photo,
         paid_amount=order.paid_amount,
+        order_type_id=order.order_type_id,
+        quantity=order.quantity,
+        customer_id=order.customer_id,
         materials=material_rows,
         payouts=payout_rows,
     )
@@ -654,13 +827,18 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/orders/{order_id}", response_model=workshop_schema.WorkshopOrderOut)
+@router.patch("/orders/{order_id}", response_model=workshop_schema.WorkshopOrderOut)
 def update_order(order_id: int, payload: workshop_schema.WorkshopOrderUpdate, db: Session = Depends(get_db)):
     order = _get_order(db, order_id)
     _assert_order_open(order)
     if payload.status == "closed":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use close endpoint to close order")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    quantity_changed = "quantity" in updates
+    for field, value in updates.items():
         setattr(order, field, value)
+    if quantity_changed:
+        _recalculate_order_totals(order)
     db.commit()
     db.refresh(order)
     return order
@@ -703,21 +881,25 @@ def add_material(order_id: int, payload: workshop_schema.WorkshopMaterialCreate,
     workshop_branch = _get_workshop_branch(db)
     if order.branch_id != workshop_branch.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Можно списывать только со склада цеха")
-    if payload.quantity <= 0:
+    per_unit_qty = payload.per_unit_qty if payload.per_unit_qty is not None else payload.quantity
+    if per_unit_qty <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity must be positive")
+    total_qty = per_unit_qty * _order_multiplier(order)
     stock = (
         db.query(Stock)
         .filter(Stock.branch_id == workshop_branch.id, Stock.product_id == payload.product_id)
         .with_for_update()
         .first()
     )
-    if not stock or stock.quantity < float(payload.quantity):
+    if not stock or stock.quantity < float(total_qty):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недостаточно остатков на складе")
-    stock.quantity = stock.quantity - float(payload.quantity)
+    stock.quantity = stock.quantity - float(total_qty)
     material = WorkshopOrderMaterial(
         order_id=order.id,
         product_id=payload.product_id,
-        quantity=payload.quantity,
+        quantity=total_qty,
+        per_unit_qty=per_unit_qty,
+        total_qty=total_qty,
         unit=payload.unit,
     )
     db.add(material)
@@ -744,8 +926,17 @@ def add_payout(order_id: int, payload: workshop_schema.WorkshopPayoutCreate, db:
     employee = db.get(WorkshopEmployee, payload.employee_id)
     if not employee or not employee.active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Сотрудник не найден")
-    payout = WorkshopOrderPayout(order_id=order.id, employee_id=employee.id, amount=payload.amount, note=payload.note)
-    employee.total_salary = (employee.total_salary or Decimal("0")) + payload.amount
+    per_unit_amount = payload.per_unit_amount if payload.per_unit_amount is not None else payload.amount
+    total_amount = per_unit_amount * _order_multiplier(order)
+    payout = WorkshopOrderPayout(
+        order_id=order.id,
+        employee_id=employee.id,
+        amount=total_amount,
+        per_unit_amount=per_unit_amount,
+        total_amount=total_amount,
+        note=payload.note,
+    )
+    employee.total_salary = (employee.total_salary or Decimal("0")) + total_amount
     db.add(payout)
     db.commit()
     db.refresh(payout)
@@ -801,7 +992,7 @@ def workshop_income_products(
     if search:
         term = f"%{search}%"
         query = query.filter((Product.name.ilike(term)) | (Product.barcode.ilike(term)))
-    products = query.order_by(Product.name.asc()).limit(50).all()
+    products = query.order_by(Product.name.asc()).limit(500).all()
     return [
         workshop_schema.WorkshopIncomeProduct(
             id=product.id,
@@ -1156,6 +1347,33 @@ def _log_request(request: Request, current_user: User | None) -> None:
     )
 
 
+
+
+def _get_products_catalog(
+    search: Optional[str],
+    limit: int,
+    db: Session,
+) -> list[workshop_schema.WorkshopStockProduct]:
+    query = db.query(Product)
+    if search:
+        term = f"%{search}%"
+        query = query.filter((Product.name.ilike(term)) | (Product.barcode.ilike(term)))
+    rows = query.order_by(Product.name.asc()).limit(limit).all()
+    return [
+        workshop_schema.WorkshopStockProduct(
+            id=product.id,
+            product_id=product.id,
+            name=product.name,
+            barcode=product.barcode,
+            unit=product.unit,
+            quantity=product.quantity or 0,
+            available_qty=None,
+            photo=product.photo,
+            image_url=product.image_url,
+        )
+        for product in rows
+    ]
+
 def _get_workshop_stock(
     search: Optional[str],
     limit: int,
@@ -1211,12 +1429,12 @@ def workshop_stock_products(
 def workshop_products(
     request: Request,
     search: Optional[str] = Query(None, alias="q"),
-    limit: int = Query(20, ge=1, le=200),
+    limit: int = Query(200, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     _log_request(request, current_user)
-    return _get_workshop_stock(search, limit, db)
+    return _get_products_catalog(search, limit, db)
 
 
 @router.get("/stock", response_model=list[workshop_schema.WorkshopStockProduct])
