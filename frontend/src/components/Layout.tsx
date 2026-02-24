@@ -32,6 +32,8 @@ export const Layout = () => {
   const productionManagerAllowedRoutes = [
     "/workshop/orders",
     "/workshop/templates",
+    "/workshop/order-types",
+    "/workshop/customers",
     "/workshop/expenses",
     "/workshop/stock",
     "/workshop/income",
