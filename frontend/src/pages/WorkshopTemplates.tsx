@@ -32,8 +32,6 @@ interface TemplateDetail {
   description?: string;
   active: boolean;
   amount?: number;
-  quantity?: number;
-  customer_id?: number;
   order_type_id?: number;
   items: TemplateItem[];
 }
@@ -56,15 +54,12 @@ export default function WorkshopTemplates() {
   const [createDescription, setCreateDescription] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateDetail | null>(null);
   const [createAmount, setCreateAmount] = useState("0");
-  const [createQuantity, setCreateQuantity] = useState("1");
   const [materialSearch, setMaterialSearch] = useState("");
   const [materialOpen, setMaterialOpen] = useState(false);
   const [materialOptions, setMaterialOptions] = useState<StockProduct[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<StockProduct | null>(null);
   const [materialQty, setMaterialQty] = useState("1");
-  const [customers, setCustomers] = useState<DictOption[]>([]);
   const [orderTypes, setOrderTypes] = useState<DictOption[]>([]);
-  const [createCustomerId, setCreateCustomerId] = useState("");
   const [createOrderTypeId, setCreateOrderTypeId] = useState("");
 
   const loadTemplates = async () => {
@@ -89,7 +84,6 @@ export default function WorkshopTemplates() {
 
   useEffect(() => {
     loadTemplates();
-    apiGet<DictOption[]>("/api/workshop/customers?active=true").then(setCustomers).catch(() => undefined);
     apiGet<DictOption[]>("/api/workshop/order-types?active=true").then(setOrderTypes).catch(() => undefined);
   }, []);
 
@@ -115,8 +109,6 @@ export default function WorkshopTemplates() {
         name: createName,
         description: createDescription || undefined,
         amount: Number(createAmount) || 0,
-        quantity: Math.max(1, Number(createQuantity) || 1),
-        customer_id: createCustomerId ? Number(createCustomerId) : undefined,
         order_type_id: createOrderTypeId ? Number(createOrderTypeId) : undefined,
         items: [],
       });
@@ -124,8 +116,6 @@ export default function WorkshopTemplates() {
       setCreateName("");
       setCreateDescription("");
       setCreateAmount("0");
-      setCreateQuantity("1");
-      setCreateCustomerId("");
       setCreateOrderTypeId("");
       setSelectedTemplate(created);
       loadTemplates();
@@ -142,7 +132,6 @@ export default function WorkshopTemplates() {
         description: selectedTemplate.description || undefined,
         active: selectedTemplate.active,
         amount: selectedTemplate.amount || 0,
-        quantity: selectedTemplate.quantity || 1,
       });
       setSelectedTemplate(null);
       toast.success("Шаблон обновлен");
@@ -226,8 +215,6 @@ export default function WorkshopTemplates() {
           <form className="grid gap-3" onSubmit={createTemplate}>
             <div className="grid gap-1"><Label>Название заказа</Label><Input value={createName} onChange={(event) => setCreateName(event.target.value)} required /></div>
             <div className="grid gap-1"><Label>Сумма</Label><Input type="number" step="0.01" value={createAmount} onChange={(event) => setCreateAmount(event.target.value)} /></div>
-            <div className="grid gap-1"><Label>Количество</Label><Input type="number" min={1} value={createQuantity} onChange={(event) => setCreateQuantity(event.target.value)} /></div>
-            <div className="grid gap-1"><Label>Заказчик</Label><select className="border rounded h-10 px-3 bg-background" value={createCustomerId} onChange={(event) => setCreateCustomerId(event.target.value)}><option value="">Не выбран</option>{customers.map((item)=><option key={item.id} value={item.id}>{item.name || `#${item.id}`}</option>)}</select></div>
             <div className="grid gap-1"><Label>Тип заказа</Label><select className="border rounded h-10 px-3 bg-background" value={createOrderTypeId} onChange={(event) => setCreateOrderTypeId(event.target.value)}><option value="">Не выбран</option>{orderTypes.map((item)=><option key={item.id} value={item.id}>{item.name || `#${item.id}`}</option>)}</select></div>
             <div className="grid gap-1"><Label>Описание</Label><Textarea value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} /></div>
             <div className="grid gap-1"><Label>Фото</Label><Input placeholder="Загрузка фото доступна в заказе" disabled /></div>
