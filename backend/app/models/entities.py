@@ -509,6 +509,7 @@ class WorkshopOrder(Base, TimestampMixin):
         ForeignKey("workshop_order_types.id", ondelete="SET NULL"), nullable=True
     )
     quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=1, server_default=text("1"))
+    unit_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
     customer_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("workshop_customers.id", ondelete="SET NULL"), nullable=True
     )

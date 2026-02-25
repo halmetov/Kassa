@@ -127,6 +127,7 @@ class WorkshopOrderBase(BaseModel):
     paid_amount: Optional[Decimal] = None
     order_type_id: Optional[int] = None
     quantity: Optional[int] = Field(default=1, ge=1)
+    unit_price: Optional[Decimal] = None
     customer_id: Optional[int] = None
     customer_new_name: Optional[str] = None
     customer_new_phone: Optional[str] = None
@@ -134,7 +135,7 @@ class WorkshopOrderBase(BaseModel):
 
 
 class WorkshopOrderCreate(WorkshopOrderBase):
-    order_type_id: int = Field(...)
+    order_type_id: Optional[int] = None
     template_id: Optional[int] = None
     materials: Optional[list["WorkshopMaterialCreate"]] = None
 
@@ -147,6 +148,7 @@ class WorkshopOrderUpdate(BaseModel):
     status: Optional[str] = None
     order_type_id: Optional[int] = None
     quantity: Optional[int] = Field(default=None, ge=1)
+    unit_price: Optional[Decimal] = None
     customer_id: Optional[int] = None
     customer_new_name: Optional[str] = None
     customer_new_phone: Optional[str] = None
@@ -277,6 +279,7 @@ class WorkshopOrderTemplateListOut(BaseModel):
     name: str
     description: Optional[str] = None
     active: bool
+    photo: Optional[str] = None
     branch_id: int
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
