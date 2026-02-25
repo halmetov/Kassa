@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiDelete, apiGet, apiPost, apiPut } from "@/api/client";
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,7 @@ interface TemplateListItem {
   description?: string;
   active: boolean;
   items_count: number;
+  photo?: string;
 }
 
 interface TemplateItem {
@@ -33,6 +34,7 @@ interface TemplateDetail {
   active: boolean;
   amount?: number;
   order_type_id?: number;
+  photo?: string;
   items: TemplateItem[];
 }
 
@@ -141,6 +143,21 @@ export default function WorkshopTemplates() {
     }
   };
 
+
+  const uploadTemplatePhoto = async (file: File) => {
+    if (!selectedTemplate) return;
+    try {
+      const formData = new FormData();
+      formData.append("photo_file", file);
+      const updated = await apiUpload<TemplateDetail>(`/api/workshop/templates/${selectedTemplate.id}/photo`, formData);
+      setSelectedTemplate(updated);
+      loadTemplates();
+      toast.success("Фото шаблона обновлено");
+    } catch (error: any) {
+      toast.error(error?.message || "Не удалось загрузить фото шаблона");
+    }
+  };
+
   const removeTemplate = async (templateId: number) => {
     const confirmed = window.confirm("Удалить шаблон?");
     if (!confirmed) return;
@@ -217,7 +234,7 @@ export default function WorkshopTemplates() {
             <div className="grid gap-1"><Label>Сумма</Label><Input type="number" step="0.01" value={createAmount} onChange={(event) => setCreateAmount(event.target.value)} /></div>
             <div className="grid gap-1"><Label>Тип заказа</Label><select className="border rounded h-10 px-3 bg-background" value={createOrderTypeId} onChange={(event) => setCreateOrderTypeId(event.target.value)}><option value="">Не выбран</option>{orderTypes.map((item)=><option key={item.id} value={item.id}>{item.name || `#${item.id}`}</option>)}</select></div>
             <div className="grid gap-1"><Label>Описание</Label><Textarea value={createDescription} onChange={(event) => setCreateDescription(event.target.value)} /></div>
-            <div className="grid gap-1"><Label>Фото</Label><Input placeholder="Загрузка фото доступна в заказе" disabled /></div>
+            <div className="grid gap-1"><Label>Фото</Label><Input placeholder="Сначала создайте шаблон, затем загрузите фото в режиме редактирования" disabled /></div>
             <Button type="submit">Создать шаблон</Button>
           </form>
         </CardContent>
@@ -247,6 +264,9 @@ export default function WorkshopTemplates() {
                   </div>
                   {template.description && (
                     <div className="text-xs text-muted-foreground">{template.description}</div>
+                  )}
+                  {template.photo && (
+                    <img src={template.photo} alt={template.name} className="mt-2 h-12 w-12 rounded object-cover border" />
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -292,6 +312,21 @@ export default function WorkshopTemplates() {
                   }
                 />
                 <span className="text-sm">Активен</span>
+              </div>
+              {selectedTemplate.photo && (
+                <img src={selectedTemplate.photo} alt={selectedTemplate.name} className="h-28 w-28 rounded object-cover border" />
+              )}
+              <div className="grid gap-1">
+                <Label>Загрузить фото</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) uploadTemplatePhoto(file);
+                    event.currentTarget.value = "";
+                  }}
+                />
               </div>
               <Button onClick={updateTemplate}>Сохранить шаблон</Button>
             </div>
