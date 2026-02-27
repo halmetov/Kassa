@@ -4,10 +4,16 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 from pydantic.config import ConfigDict
 
 from app.schemas import income as income_schema
+
+
+def _to_decimal(value: Decimal | float | int | str | None) -> Decimal | None:
+    if value is None:
+        return None
+    return Decimal(str(value))
 
 
 class WorkshopEmployeeBase(BaseModel):
@@ -169,9 +175,12 @@ class WorkshopOrderOut(WorkshopOrderBase):
 
 class WorkshopMaterialCreate(BaseModel):
     product_id: int
-    quantity: Decimal
-    per_unit_qty: Optional[Decimal] = None
+    quantity: Decimal = Field(gt=0)
+    per_unit_qty: Optional[Decimal] = Field(default=None, gt=0)
     unit: Optional[str] = None
+
+    _validate_quantity = field_validator("quantity", mode="before")(_to_decimal)
+    _validate_per_unit = field_validator("per_unit_qty", mode="before")(_to_decimal)
 
 
 class WorkshopMaterialOut(BaseModel):
@@ -223,11 +232,15 @@ class WorkshopOrderDetail(WorkshopOrderOut):
 
 class WorkshopOrderTemplateItemIn(BaseModel):
     product_id: int
-    quantity: Decimal
+    quantity: Decimal = Field(gt=0)
+
+    _validate_quantity = field_validator("quantity", mode="before")(_to_decimal)
 
 
 class WorkshopOrderTemplateItemUpdate(BaseModel):
-    quantity: Decimal
+    quantity: Decimal = Field(gt=0)
+
+    _validate_quantity = field_validator("quantity", mode="before")(_to_decimal)
 
 
 class WorkshopOrderTemplateItemOut(BaseModel):

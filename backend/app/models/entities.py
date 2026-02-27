@@ -88,7 +88,7 @@ class Stock(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     branch_id: Mapped[int] = mapped_column(ForeignKey("branches.id", ondelete="CASCADE"))
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
-    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False, default=Decimal("0"), server_default=text("0"))
 
     branch: Mapped[Branch] = relationship(back_populates="stock_items")
     product: Mapped[Product] = relationship(back_populates="stocks")
@@ -536,9 +536,9 @@ class WorkshopOrderMaterial(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("workshop_orders.id", ondelete="CASCADE"))
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
-    per_unit_qty: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
-    total_qty: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False, default=Decimal("0"), server_default=text("0"))
+    per_unit_qty: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 3), nullable=True)
+    total_qty: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 3), nullable=True)
     unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     order: Mapped[WorkshopOrder] = relationship("WorkshopOrder", back_populates="materials")
@@ -630,7 +630,7 @@ class WorkshopOrderTemplateItem(Base):
         ForeignKey("workshop_order_templates.id", ondelete="CASCADE")
     )
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0"), server_default=text("0"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False, default=Decimal("0"), server_default=text("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     template: Mapped[WorkshopOrderTemplate] = relationship("WorkshopOrderTemplate", back_populates="items")
