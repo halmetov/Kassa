@@ -80,7 +80,7 @@ def _get_or_create_stock(db: Session, branch_id: int, product_id: int) -> Stock:
     )
     if stock:
         return stock
-    stock = Stock(branch_id=branch_id, product_id=product_id, quantity=0)
+    stock = Stock(branch_id=branch_id, product_id=product_id, quantity=Decimal("0"))
     db.add(stock)
     db.flush()
     return stock
@@ -552,7 +552,7 @@ def create_order(
             product = _ensure_workshop_product(db, branch.id, product_id)
             total_qty = data["per_unit_qty"] * multiplier
             stock = _get_or_create_stock(db, branch.id, product_id)
-            stock.quantity = stock.quantity - float(total_qty)
+            stock.quantity = Decimal(str(stock.quantity or 0)) - total_qty
             material = WorkshopOrderMaterial(
                 order_id=order.id,
                 product_id=product_id,
@@ -964,7 +964,7 @@ def update_order(order_id: int, payload: workshop_schema.WorkshopOrderUpdate, db
             new_total = base_qty * _order_multiplier(order)
             delta = new_total - old_total
             stock = _get_or_create_stock(db, workshop_branch.id, material.product_id)
-            stock.quantity = stock.quantity - float(delta)
+            stock.quantity = Decimal(str(stock.quantity or 0)) - delta
             material.per_unit_qty = base_qty
             material.total_qty = new_total
             material.quantity = new_total
@@ -1026,7 +1026,7 @@ def add_material(order_id: int, payload: workshop_schema.WorkshopMaterialCreate,
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity must be positive")
     total_qty = per_unit_qty * _order_multiplier(order)
     stock = _get_or_create_stock(db, workshop_branch.id, payload.product_id)
-    stock.quantity = stock.quantity - float(total_qty)
+    stock.quantity = Decimal(str(stock.quantity or 0)) - total_qty
     material = WorkshopOrderMaterial(
         order_id=order.id,
         product_id=payload.product_id,

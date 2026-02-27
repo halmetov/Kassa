@@ -41,9 +41,7 @@ export const Layout = () => {
     "/workshop/report",
     "/workshop/salary",
   ];
-  const productionAllowedRoutes = productionManagerAllowedRoutes.filter(
-    (route) => route !== "/workshop/salary" && route !== "/workshop/templates",
-  );
+  const productionAllowedRoutes = productionManagerAllowedRoutes;
 
   const isPathAllowed = (path: string, allowed: string[]) =>
     allowed.some((route) => path === route || path.startsWith(`${route}/`));
